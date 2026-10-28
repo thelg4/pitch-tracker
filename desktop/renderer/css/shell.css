@@ -67,6 +67,7 @@ body[data-platform=darwin] #titlebar{padding-left:78px}
 #sheetHost.open .sheet{transform:translate(-50%,0)}
 #sheetHost.closing{pointer-events:none}
 #sheetHost.closing *{pointer-events:none}
+.sheet:focus{outline:none}
 .sheet h2{margin:0;font-size:13px;font-weight:700;text-transform:none;letter-spacing:normal}
 .sheet-body{display:grid;gap:12px}
 .sheet-body p{margin:0;color:var(--dim)}

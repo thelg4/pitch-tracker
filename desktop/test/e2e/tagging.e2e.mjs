@@ -80,7 +80,7 @@ try {
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
     const [lx, ly] = onCrop(540 + dxIn * 10, 1250 - upIn * 10); await page.mouse.click(lx, ly);
   };
-  const syncCropRect = async () => { await page.evaluate(() => document.querySelector('#center').scrollTo(0, 0)); Object.assign(cropR, await rect('#cvCrop')); };
+  const syncCropRect = async () => { Object.assign(cropR, await rect('#cvCrop')); }; // the catcher pane moves when the layout changes
   for (const [type, dxIn, upIn] of plan) {
     await page.click(`#types [data-t="${type}"]`);
     await syncCropRect();
@@ -211,6 +211,27 @@ try {
   assert.deepEqual(r.slice(0, 3).map(x => x[0]), ['13', '12', '11'], `rows after the burst: ${r.map(x => x[0]).join(',')}`);
   assert.deepEqual([r[1][4], r[1][5], r[0][4], r[0][5]], ['A 3.0"', 'U 2.0"', 'G 6.0"', 'D 1.0"'], `burst rows ${r[1].join(' | ')} ; ${r[0].join(' | ')}`);
 
+  // 2b. A failed save: the next addPitch rejects once in main. The pitch is not dropped silently: a toast says so,
+  // the draft comes back so clicking the catch again saves it, and nothing is left unhandled.
+  await app.evaluate(({ ipcMain }) => {
+    const h = ipcMain._invokeHandlers, orig = h.get('db');
+    h.set('db', (e, ...args) => { if (args[0] === 'addPitch') { h.set('db', orig); return Promise.reject(new Error('disk full')); } return orig(e, ...args); });
+  });
+  await page.click('#types [data-t="FB"]');
+  await page.keyboard.press('Shift+ArrowRight');
+  await page.mouse.click(...onCrop(540, 1250));
+  await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
+  const [fx, fy] = onCrop(540 + 2 * 10, 1250 - 1 * 10);
+  await page.mouse.click(fx, fy);
+  await page.waitForFunction(() => /Couldn.t save pitch #14/.test(document.querySelector('#toast').textContent));
+  assert.equal((await logRows()).length, 13, 'the failed pitch is not in the list');
+  assert.equal(await page.$eval('#tools [data-tool="catch"]', e => e.getAttribute('aria-pressed')), 'true', 'the draft is restored, waiting for the catch');
+  await page.mouse.click(fx, fy);
+  await page.waitForFunction(() => document.querySelectorAll('#log tbody tr').length === 14);
+  r = await logRows();
+  assert.deepEqual([r[0][0], r[0][1], r[0][4], r[0][5]], ['14', 'FB', 'A 2.0"', 'U 1.0"'], `retried row ${r[0].join(' | ')}`);
+  assert.deepEqual(errors, [], 'no unhandled rejection from the failed save');
+
   // 3. Minimum window size: the catcher view stays usable and the page itself never scrolls.
   const setWinSize = (w, h) => app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setSize(w, h), [w, h]);
   // The viewport is pinned by setViewportSize (a per-session emulation override), so pin it to the window's new content size.
@@ -225,9 +246,24 @@ try {
     sh: document.scrollingElement.scrollHeight, ih: innerHeight }));
   assert.ok(min.crop > 300, `#cvCrop is ${min.crop}px wide at 1000x700`);
   assert.ok(min.sh <= min.ih, `document scrolls at 1000x700 (${min.sh} > ${min.ih})`);
+  // #center itself never scrolls as a page, in either the Timeline or the List view; the list scrolls inside.
+  const centerFits = () => page.$eval('#center', c => [c.scrollHeight, c.clientHeight]);
+  for (const v of ['list', 'timeline']) {
+    await page.click(`#viewToggle [data-v="${v}"]`);
+    await page.waitForTimeout(100);
+    const [sh, chh] = await centerFits();
+    assert.ok(sh <= chh, `#center scrolls in the ${v} view at 1000x700 (${sh} > ${chh})`);
+  }
   await setWinSize(1440, 1000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.waitForFunction(() => innerWidth === 1440);
+  await page.waitForTimeout(300);
+  for (const v of ['list', 'timeline']) {
+    await page.click(`#viewToggle [data-v="${v}"]`);
+    await page.waitForTimeout(100);
+    const [sh, chh] = await centerFits();
+    assert.ok(sh <= chh, `#center scrolls in the ${v} view at 1440x1000 (${sh} > ${chh})`);
+  }
 
   // 4. Missing video: a session whose file is gone shows the relink prompt and stays usable.
   const MISSING = path.join(OUT, 'no-such-video.mov');
@@ -250,7 +286,24 @@ try {
 
   // 5. Delete the current session: confirm the sheet with Return; the app goes to the athlete and the sidebar drops it.
   await openSession(1);
+  // One press of Space must never confirm a destructive sheet.
   await menu('delete-session');
+  await page.waitForSelector('#sheetHost form [type=submit]');
+  assert.notEqual(await page.evaluate(() => document.activeElement?.matches('#sheetHost [type=submit]')), true, 'the destructive button is not focused');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(400);
+  assert.equal(await page.evaluate(() => location.hash), '#/session/1');
+  assert.equal(await page.$$eval('.sb-session[data-id="1"]', e => e.length), 1, 'the session is still in the sidebar after Space');
+  assert.equal(asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)}); console.log(!!d.getSession(1)); d.close();`).trim(), 'true', 'the session is still in the database after Space');
+  // Space on the destructive button itself (focused by Tab or a click) does nothing either.
+  if (!(await page.$('#sheetHost form'))) { await menu('delete-session'); }
+  await page.waitForSelector('#sheetHost form [type=submit]');
+  await page.focus('#sheetHost [type=submit]');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(400);
+  assert.equal(await page.evaluate(() => location.hash), '#/session/1');
+  assert.ok(await page.$('#sheetHost form'), 'the sheet stays open after Space on Delete Session');
+  assert.equal(asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)}); console.log(!!d.getSession(1)); d.close();`).trim(), 'true', 'the session survives Space on the destructive button');
   await page.waitForSelector('#sheetHost form [type=submit]');
   await page.keyboard.press('Enter');
   // The hash changes before the route redraws the sidebar and mounts the athlete page, so wait for all three.

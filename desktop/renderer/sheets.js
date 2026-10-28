@@ -1,9 +1,13 @@
 // macOS-style sheets: a form that slides down from under the title bar over a dimmed backdrop.
 // Esc cancels (null); Return or the confirm button resolves the form's FormData. One sheet at a time.
+// Space never confirms: a sheet opens with focus on its first field, or on Cancel (the form itself when there is
+// no Cancel), never on the confirm button, and Space on the confirm button is swallowed.
 import { esc } from './util.js';
 import { reducedMotion } from './motion.js';
 
 let current = null; // {close(result)}
+
+export const isOpen = () => current !== null;
 
 export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Cancel', destructive = false}){
   current?.close(null);
@@ -11,7 +15,7 @@ export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Canc
   const returnFocus = document.activeElement;
   host.classList.remove('closing', 'open');
   host.innerHTML = `<div class="sheet-backdrop"></div>
-    <form class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <form class="sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
       <h2 id="sheetTitle">${esc(title)}</h2>
       <div class="sheet-body">${body}</div>
       <div class="sheet-actions">
@@ -23,7 +27,8 @@ export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Canc
   app.inert = true;
   void host.offsetWidth;
   host.classList.add('open');
-  (form.querySelector('[autofocus]') || form.querySelector('input,select,textarea') || form.querySelector('[type=submit]')).focus();
+  const field = destructive ? null : form.querySelector('[autofocus]') || form.querySelector('input,select,textarea');
+  (field || form.querySelector('[data-cancel]') || form).focus();
 
   return new Promise(resolve => {
     const sheet = {close};
@@ -33,7 +38,9 @@ export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Canc
       if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); close(null); }
       else{
         e.stopPropagation(); // even from inside the sheet: Space or a letter on a focused button must not reach a view
-        if(e.key === 'Enter' && form.contains(e.target) && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON'){ e.preventDefault(); form.requestSubmit(); }
+        const t = e.target, isCancel = t.matches?.('[data-cancel]');
+        if(e.key === ' ' && t.matches?.('[type=submit]')) e.preventDefault(); // Space on the confirm button does nothing
+        else if(e.key === 'Enter' && t.tagName !== 'TEXTAREA' && !isCancel){ e.preventDefault(); form.requestSubmit(); }
       }
     };
     window.addEventListener('keydown', onKey, true);

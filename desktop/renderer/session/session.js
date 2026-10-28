@@ -215,11 +215,22 @@ export async function sessionView(root, id, ctx){
     renderAll();
   }
   // The draft is taken and the next pitch started before the save is awaited, so a click that arrives while
-  // it is saving starts the next pitch instead of re-committing this one.
+  // it is saving starts the next pitch instead of re-committing this one. If the save fails, the draft comes
+  // back waiting for the catch, unless a new mark was started meanwhile.
   async function commit(){
     const d = {type: curType, glove: draft.glove, manual: draft.manual, loc: draft.loc, zone: {...S.zone}};
-    draft = newDraft(); mode = source === 'manual' ? 'manual' : 'target';
-    const p = await db('addPitch', S.id, d);
+    const n = pitches.length + 1, next = newDraft(), nextMode = source === 'manual' ? 'manual' : 'target';
+    draft = next; mode = nextMode;
+    let p;
+    try{ p = await db('addPitch', S.id, d); }
+    catch{
+      if(dead) return;
+      toast(`Couldn't save pitch #${n} — click the catch again`);
+      if(draft === next && !next.glove && !next.manual && !next.loc && mode === nextMode && !selectedId){
+        draft = {glove: d.glove, manual: d.manual, loc: null}; mode = 'location'; renderAll();
+      }
+      return;
+    }
     if(dead) return;
     pitches.push(p);
     pitchesChanged(); popAt(p);
