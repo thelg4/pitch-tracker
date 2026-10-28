@@ -253,8 +253,10 @@ try {
   await menu('delete-session');
   await page.waitForSelector('#sheetHost form [type=submit]');
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => location.hash === '#/athlete/1');
-  await page.waitForSelector(`.sb-session[data-id="${missingId}"]`);
+  // The hash changes before the route redraws the sidebar and mounts the athlete page, so wait for all three.
+  await page.waitForFunction(id => location.hash === '#/athlete/1' && !document.querySelector('.sb-session[data-id="1"]')
+    && document.querySelector(`.sb-session[data-id="${id}"]`) && document.querySelectorAll('#sessions tr[data-id]').length === 1, missingId);
+  assert.equal(await page.evaluate(() => location.hash), '#/athlete/1');
   assert.equal(await page.$$eval('.sb-session[data-id="1"]', e => e.length), 0);
   assert.equal(await page.$$eval('#sessions tr[data-id]', e => e.length), 1);
   assert.deepEqual(errors, []);
