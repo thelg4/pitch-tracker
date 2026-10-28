@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, shell, Menu } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
+import { menuTemplate } from './menu-template.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VIDEO_EXT = ['mov', 'mp4', 'm4v'];
@@ -66,6 +67,8 @@ app.whenReady().then(() => {
     picked.add(file); return true;
   });
   ipcMain.handle('reveal-db', () => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(a => BrowserWindow.getFocusedWindow()?.webContents.send('menu', a))));
 
   createWindow();
   app.on('activate', () => { if(BrowserWindow.getAllWindows().length === 0) createWindow(); });

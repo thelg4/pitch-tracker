@@ -7,5 +7,6 @@ contextBridge.exposeInMainWorld('bullpen', {
   chooseVideo: () => ipcRenderer.invoke('choose-video'),
   allowVideo: file => ipcRenderer.invoke('allow-video', file),
   pathForFile: file => webUtils.getPathForFile(file),
+  onMenu: cb => ipcRenderer.on('menu', (_e, action) => cb(action)),
   revealDb: () => ipcRenderer.invoke('reveal-db'),
 });
