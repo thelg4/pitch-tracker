@@ -26,9 +26,9 @@ export function heat(list){
   let h = '<div class="heat"><span></span><span class="cl">Glove side</span><span class="cl">Middle</span><span class="cl">Arm side</span>';
   ['Up','Mid','Down'].forEach((r,ri) => { h += `<span class="rl">${r}</span>`;
     for(let c=0;c<3;c++){ const cell = cells[ri*3+c];
-      if(!cell.n){ h += `<div class="c" style="background:var(--sunk);border:1px dashed var(--line)"><span class="hint">no targets</span></div>`; continue; }
+      if(!cell.n){ h += `<div class="c" style="border:1px dashed var(--line)"><span class="hint">no targets</span></div>`; continue; }
       const t = tone(cell.score), mix = 12 + Math.round(cell.hit*30);
-      h += `<div class="c" style="background:color-mix(in srgb,var(--${t}) ${mix}%,var(--surface));" title="Average score ${Math.round(cell.score)}"><b>${Math.round(cell.hit*100)}%</b><span>${cell.h}/${cell.n} hit</span></div>`; } });
+      h += `<div class="c" style="background:color-mix(in srgb,var(--${t}) ${mix}%,transparent);" title="Average score ${Math.round(cell.score)}"><b>${Math.round(cell.hit*100)}%</b><span>${cell.h}/${cell.n} hit</span></div>`; } });
   h += '</div>';
   if(out) h += `<span class="hint">${out} target${out>1?'s':''} set outside the zone (chase spots) not shown.</span>`;
   return h;
@@ -36,16 +36,16 @@ export function heat(list){
 
 // Line chart of 0–100 values. points: [{v, dotV?, color?, label, title}]; the line is `v`, dots are `dotV ?? v`.
 function lineChart(points, aria){
-  const W=340, H=190, L=30, B=24, T=10, Rr=10, n=points.length;
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:560px" role="img" aria-label="${aria}">`;
+  const W=560, H=220, L=30, B=24, T=10, Rr=10, n=points.length;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${aria}">`;
   const x = i => L + (n<=1 ? (W-L-Rr)/2 : i*(W-L-Rr)/(n-1)), y = v => T + (100-v)*(H-T-B)/100;
-  [0,25,50,75,100].forEach(v => svg += `<line class="grid" x1="${L}" x2="${W-Rr}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3}" text-anchor="end">${v}</text>`);
+  [0,25,50,75,100].forEach(v => svg += `<line stroke="rgba(255,255,255,.07)" x1="${L}" x2="${W-Rr}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3}" text-anchor="end">${v}</text>`);
   if(n){
     const pts = points.map((p,i)=>`${x(i).toFixed(1)},${y(p.v).toFixed(1)}`);
-    svg += `<path d="M${x(0)},${y(0)} L${pts.join(' L')} L${x(n-1)},${y(0)} Z" fill="var(--accent)" fill-opacity=".1"/>`;
-    points.forEach((p,i)=> svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.dotV ?? p.v).toFixed(1)}" r="2.8" fill="${p.color || 'var(--accent)'}" fill-opacity=".75"><title>${esc(p.title)}</title></circle>`);
-    svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>`;
-    svg += `<circle cx="${x(n-1)}" cy="${y(points[n-1].v)}" r="4.5" fill="var(--accent)"/>`;
+    svg += `<path class="area" d="M${x(0)},${y(0)} L${pts.join(' L')} L${x(n-1)},${y(0)} Z" fill="var(--accent)" fill-opacity=".16"/>`;
+    points.forEach((p,i)=> svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(p.dotV ?? p.v).toFixed(1)}" r="3" fill="${p.color || 'var(--accent)'}" fill-opacity=".85"><title>${esc(p.title)}</title></circle>`);
+    svg += `<polyline class="draw" pathLength="1" points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    svg += `<circle cx="${x(n-1)}" cy="${y(points[n-1].v)}" r="5" fill="var(--accent)" stroke="var(--bg)" stroke-width="2"/>`;
     const ticks = n<=8 ? points.map((_,i)=>i) : [0, Math.floor((n-1)/2), n-1];
     ticks.forEach(i => svg += `<text x="${x(i)}" y="${H-8}" text-anchor="middle">${esc(points[i].label)}</text>`);
   }

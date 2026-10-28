@@ -35,6 +35,7 @@ try {
   await page.waitForSelector('.sb-session[data-id]');
   await page.waitForSelector('#sessions tr[data-id]');
   await page.screenshot({ path: `${OUT}/shell.png` });
+  await page.screenshot({ path: `${OUT}/athlete.png` });
   await page.click('.sb-session[data-id]');
   await page.waitForFunction(() => document.querySelector('#drop')?.hidden && document.querySelector('#scrub').max > 1, null, { timeout: 15000 });
   await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running')); // let the page crossfade settle
@@ -101,6 +102,8 @@ try {
   await page.click('.sb-athlete[data-id]');
   await page.waitForSelector('#sessions tr[data-id]');
   await page.screenshot({ path: `${OUT}/4-athlete.png`, fullPage: true });
+  await page.waitForTimeout(800); // let the count-up and line draw-in finish
+  await page.screenshot({ path: `${OUT}/athlete-tagged.png` });
   assert.deepEqual(errors, []);
 } finally {
   await app.close();
