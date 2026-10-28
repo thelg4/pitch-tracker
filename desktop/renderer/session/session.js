@@ -1,9 +1,9 @@
-// Session view: tag one bullpen video. The full frame sits on the left with a movable crop box; the zoomed
-// crop on the right is where the zone, targets and catches are marked. Both canvases draw from one hidden
-// <video>, so they always show the same frame. All marks are stored in frame pixels.
-import { TYPES, TCOL, TNAME, clamp, fmt, scored, summary, grade, tone, GRADE_TXT, insights } from './scoring.js';
-import { scatter, legend, heat, rollingTrend, typeTable } from './charts.js';
-import { $, $$, db, esc, fmtDate, handLabel, toast, confirmTap, mediaUrl, basename } from './util.js';
+// Session view: tag one bullpen video. The viewer (viewer.js) draws the full frame and the catcher crop;
+// this controller owns the tagging state, the pointer and key handling, and the panels below the viewer.
+import { TYPES, TCOL, TNAME, clamp, fmt, scored, summary, grade, tone, GRADE_TXT, insights } from '../scoring.js';
+import { scatter, legend, heat, rollingTrend, typeTable } from '../charts.js';
+import { $, $$, db, esc, fmtDate, handLabel, toast, confirmTap, mediaUrl, basename } from '../util.js';
+import { createViewer } from './viewer.js';
 
 export async function sessionView(root, id){
   const data = await db('getSession', id);
@@ -13,8 +13,7 @@ export async function sessionView(root, id){
   let list = [];
   let draft = newDraft(), mode = S.zone ? 'target' : 'zone', source = 'glove', curType = 'FB';
   let selectedId = null, editField = null, confirmDel = false, filter = 'ALL', hasVideo = false;
-  let crop = S.crop;                       // {cx, cy, w} in frame pixels; height follows the crop pane's shape
-  let dragZone = null, dragCrop = null, pan = null, raf = 0, cropSaveT = 0;
+  let dragZone = null, dragCrop = null, pan = null, raf = 0;
   function newDraft(){ return {glove:null, manual:null, loc:null}; }
 
   root.innerHTML = `
@@ -112,7 +111,11 @@ export async function sessionView(root, id){
     </section>`;
 
   const vid = $('#vid'), cvFull = $('#cvFull'), cvCrop = $('#cvCrop'), stages = $('#stages');
-  const fw = () => vid.videoWidth || S.frameW || 1920, fh = () => vid.videoHeight || S.frameH || 1080;
+  const viewer = createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid,
+    getSession: () => S, getList: () => list, getDraft: () => ({...draft, type: curType}), getSelectedId: () => selectedId,
+    getDragZone: () => dragZone, getHasVideo: () => hasVideo, getShowAll: () => $('#showAll').checked,
+    onCropSave: crop => patchSession({crop})});
+  const drawStages = () => viewer.draw(), setCrop = (c, persist) => viewer.setCrop(c, persist), frameCatcher = () => viewer.frameCatcher();
 
   /* ---------- saving ---------- */
   async function patchSession(patch){ S = await db('updateSession', S.id, patch); }
@@ -133,13 +136,13 @@ export async function sessionView(root, id){
   vid.addEventListener('loadedmetadata', async () => {
     if(S.frameW !== vid.videoWidth || S.frameH !== vid.videoHeight){
       const d = await db('rescaleSession', S.id, vid.videoWidth, vid.videoHeight);
-      S = d.session; pitches = d.pitches; crop = S.crop;
+      S = d.session; pitches = d.pitches; viewer.crop = S.crop;
     }
     hasVideo = true;
     $('#paneFull').style.aspectRatio = `${vid.videoWidth}/${vid.videoHeight}`;
     $('#scrub').max = vid.duration;
-    if(!crop) crop = S.zone ? catcherCrop() : {cx: fw()/2, cy: fh()/2, w: fw()/3};
-    sizeCanvases(); refresh();
+    viewer.ensureCrop();
+    viewer.resize(); refresh();
   });
   vid.addEventListener('error', () => {
     hasVideo = false;
@@ -168,117 +171,50 @@ export async function sessionView(root, id){
   ['dragleave','drop'].forEach(ev => stages.addEventListener(ev, e => { e.preventDefault(); stages.classList.remove('drag'); }));
   stages.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if(f) useVideo(window.bullpen.pathForFile(f)); });
 
-  /* ---------- geometry ---------- */
-  const cssSize = cv => cv.getBoundingClientRect();
-  const cropAspect = () => { const r = cssSize(cvCrop); return r.width/r.height || 16/9; };
-  const cropRect = () => { const h = crop.w/cropAspect(); return {x: crop.cx - crop.w/2, y: crop.cy - h/2, w: crop.w, h}; };
-  function fullFit(){ const r = cssSize(cvFull), s = Math.min(r.width/fw(), r.height/fh()); return {s, ox: (r.width - fw()*s)/2, oy: (r.height - fh()*s)/2}; }
-  function cropFit(){ const r = cssSize(cvCrop), s = r.width/crop.w; return {s, ox: r.width/2 - crop.cx*s, oy: r.height/2 - crop.cy*s}; }
-  const toFrame = (e, cv, f) => { const r = cssSize(cv); return {x: (e.clientX - r.left - f.ox)/f.s, y: (e.clientY - r.top - f.oy)/f.s}; };
-  function catcherCrop(){ const z = S.zone; return {cx: z.x + z.w/2, cy: z.y + z.h/2, w: Math.max(z.w*5, z.h*2.4*cropAspect())}; }
-  function setCrop(c, persist = true){
-    crop = {cx: clamp(c.cx, 0, fw()), cy: clamp(c.cy, 0, fh()), w: clamp(c.w, fw()/25, fw())};
-    drawStages();
-    if(persist){ clearTimeout(cropSaveT); cropSaveT = setTimeout(() => patchSession({crop}), 400); }
-  }
-  function frameCatcher(){ if(!S.zone){ toast('Draw the strike zone first, then the catcher view can center on it.'); return; } setCrop(catcherCrop()); }
-
-  function sizeCanvases(){
-    for(const cv of [cvFull, cvCrop]){ const r = cssSize(cv), dpr = devicePixelRatio || 1; cv.width = r.width*dpr; cv.height = r.height*dpr; }
-    drawStages();
-  }
-  const ro = new ResizeObserver(sizeCanvases); ro.observe($('#paneFull')); ro.observe($('#paneCrop'));
-
-  /* ---------- drawing ---------- */
-  function drawStages(){ if(!crop) return; drawFull(); drawCrop(); }
-  function drawFull(){
-    const c = cvFull.getContext('2d'), dpr = devicePixelRatio || 1, f = fullFit(), W = fw()*f.s, H = fh()*f.s;
-    c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0, 0, cvFull.width, cvFull.height);
-    if(hasVideo) c.drawImage(vid, f.ox, f.oy, W, H);
-    const cr = cropRect(), x = f.ox + cr.x*f.s, y = f.oy + cr.y*f.s, w = cr.w*f.s, h = cr.h*f.s;
-    c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.rect(f.ox, f.oy, W, H); c.rect(x, y, w, h); c.fill('evenodd');
-    if($('#showAll').checked) list.forEach(p => { c.fillStyle = TCOL[p.type]; c.beginPath(); c.arc(f.ox + p.loc.x*f.s, f.oy + p.loc.y*f.s, 2.5, 0, 7); c.fill(); });
-    c.strokeStyle = '#FFD24A'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
-  }
-  function drawCrop(){
-    const c = cvCrop.getContext('2d'), dpr = devicePixelRatio || 1, r = cssSize(cvCrop), f = cropFit(), cr = cropRect();
-    c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0, 0, cvCrop.width, cvCrop.height);
-    if(hasVideo) c.drawImage(vid, cr.x, cr.y, cr.w, cr.h, 0, 0, r.width, r.height);
-    c.translate(f.ox, f.oy); c.scale(f.s, f.s); const lw = 1/f.s;
-    const z = dragZone || S.zone;
-    if(z){
-      c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2*lw; c.setLineDash([6*lw,4*lw]); c.strokeRect(z.x,z.y,z.w,z.h); c.setLineDash([]);
-      c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = lw; c.beginPath();
-      for(let i=1;i<3;i++){ c.moveTo(z.x+z.w*i/3,z.y); c.lineTo(z.x+z.w*i/3,z.y+z.h); c.moveTo(z.x,z.y+z.h*i/3); c.lineTo(z.x+z.w,z.y+z.h*i/3); }
-      c.stroke();
-      c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `${12*lw}px ui-monospace, monospace`; c.fillText('17" plate width', z.x, z.y-6*lw);
-    }
-    const sel = list.find(p => p.id === selectedId);
-    if($('#showAll').checked) list.forEach(p => { if(p !== sel) drawPitch(c, p, lw, .35); });
-    if(sel) drawPitch(c, sel, lw, 1); else drawPitch(c, {...draft, type: curType}, lw, 1);
-  }
-  function drawPitch(c, p, lw, alpha){
-    const col = TCOL[p.type] || '#fff', ppi = (p.zone || S.zone || {w:170}).w/17, ballR = 1.45*ppi;
-    c.globalAlpha = alpha;
-    const t = p.manual || p.glove;
-    if(p.glove){ // catcher's glove: ring
-      c.strokeStyle = p.manual ? 'rgba(255,255,255,.7)' : '#fff'; c.lineWidth = 2.5*lw; c.setLineDash(p.manual ? [4*lw,3*lw] : []);
-      c.beginPath(); c.arc(p.glove.x, p.glove.y, ballR*2.2, 0, 7); c.stroke(); c.setLineDash([]);
-    }
-    if(p.manual){ // manual target: crosshair
-      c.strokeStyle = '#FFD24A'; c.lineWidth = 2.5*lw; const r = ballR*2;
-      c.beginPath(); c.moveTo(p.manual.x-r,p.manual.y); c.lineTo(p.manual.x+r,p.manual.y); c.moveTo(p.manual.x,p.manual.y-r); c.lineTo(p.manual.x,p.manual.y+r); c.stroke();
-      c.beginPath(); c.arc(p.manual.x, p.manual.y, r*.6, 0, 7); c.stroke();
-    }
-    if(p.loc){
-      if(t){ c.strokeStyle = col; c.lineWidth = 2*lw; c.beginPath(); c.moveTo(t.x,t.y); c.lineTo(p.loc.x,p.loc.y); c.stroke(); }
-      c.fillStyle = col; c.strokeStyle = '#fff'; c.lineWidth = 1.5*lw; c.beginPath(); c.arc(p.loc.x, p.loc.y, ballR, 0, 7); c.fill(); c.stroke();
-    }
-    c.globalAlpha = 1;
-  }
+  const ro = new ResizeObserver(() => viewer.resize()); ro.observe($('#paneFull')); ro.observe($('#paneCrop'));
 
   /* ---------- full-frame pane: move and resize the crop box ---------- */
   cvFull.addEventListener('pointerdown', e => {
     if(!hasVideo) return;
-    const pt = toFrame(e, cvFull, fullFit()), cr = cropRect();
+    const pt = viewer.toFrameFull(e), cr = viewer.cropRect();
     const inside = pt.x >= cr.x && pt.x <= cr.x + cr.w && pt.y >= cr.y && pt.y <= cr.y + cr.h;
-    if(!inside) setCrop({...crop, cx: pt.x, cy: pt.y}, false);
-    dragCrop = {dx: pt.x - crop.cx, dy: pt.y - crop.cy}; cvFull.setPointerCapture(e.pointerId);
+    if(!inside) setCrop({...viewer.crop, cx: pt.x, cy: pt.y}, false);
+    dragCrop = {dx: pt.x - viewer.crop.cx, dy: pt.y - viewer.crop.cy}; cvFull.setPointerCapture(e.pointerId);
   });
   cvFull.addEventListener('pointermove', e => {
-    if(!dragCrop) return; const pt = toFrame(e, cvFull, fullFit());
-    setCrop({...crop, cx: pt.x - dragCrop.dx, cy: pt.y - dragCrop.dy}, false);
+    if(!dragCrop) return; const pt = viewer.toFrameFull(e);
+    setCrop({...viewer.crop, cx: pt.x - dragCrop.dx, cy: pt.y - dragCrop.dy}, false);
   });
-  cvFull.addEventListener('pointerup', () => { if(dragCrop){ dragCrop = null; setCrop(crop); } });
-  cvFull.addEventListener('wheel', e => { if(!hasVideo) return; e.preventDefault(); setCrop({...crop, w: crop.w * (e.deltaY > 0 ? 1.15 : 1/1.15)}); }, {passive: false});
+  cvFull.addEventListener('pointerup', () => { if(dragCrop){ dragCrop = null; setCrop(viewer.crop); } });
+  cvFull.addEventListener('wheel', e => { if(!hasVideo) return; e.preventDefault(); setCrop({...viewer.crop, w: viewer.crop.w * (e.deltaY > 0 ? 1.15 : 1/1.15)}); }, {passive: false});
 
   /* ---------- crop pane: zoom, pan, draw the zone, mark ---------- */
   let downOnCrop = false;
   cvCrop.addEventListener('wheel', e => {
     if(!hasVideo) return; e.preventDefault();
-    const pt = toFrame(e, cvCrop, cropFit()), k = e.deltaY < 0 ? 1.2 : 1/1.2;
-    setCrop({cx: pt.x + (crop.cx - pt.x)/k, cy: pt.y + (crop.cy - pt.y)/k, w: crop.w/k});
+    const pt = viewer.toFrameCrop(e), k = e.deltaY < 0 ? 1.2 : 1/1.2;
+    setCrop({cx: pt.x + (viewer.crop.cx - pt.x)/k, cy: pt.y + (viewer.crop.cy - pt.y)/k, w: viewer.crop.w/k});
   }, {passive: false});
   cvCrop.addEventListener('pointerdown', e => {
     if(!hasVideo) return; downOnCrop = true; cvCrop.setPointerCapture(e.pointerId);
-    if(e.shiftKey || e.button === 1){ e.preventDefault(); pan = {x: e.clientX, y: e.clientY, c: {...crop}, s: cropFit().s}; return; }
-    if(mode === 'zone' && !editField && !selectedId){ const p = toFrame(e, cvCrop, cropFit()); dragZone = {x:p.x, y:p.y, w:0, h:0, sx:p.x, sy:p.y}; }
+    if(e.shiftKey || e.button === 1){ e.preventDefault(); pan = {x: e.clientX, y: e.clientY, c: {...viewer.crop}, s: viewer.cropScale()}; return; }
+    if(mode === 'zone' && !editField && !selectedId){ const p = viewer.toFrameCrop(e); dragZone = {x:p.x, y:p.y, w:0, h:0, sx:p.x, sy:p.y}; }
   });
   cvCrop.addEventListener('pointermove', e => {
     if(pan){ setCrop({...pan.c, cx: pan.c.cx - (e.clientX - pan.x)/pan.s, cy: pan.c.cy - (e.clientY - pan.y)/pan.s}, false); return; }
-    if(dragZone){ const p = toFrame(e, cvCrop, cropFit());
+    if(dragZone){ const p = viewer.toFrameCrop(e);
       Object.assign(dragZone, {x: Math.min(p.x, dragZone.sx), y: Math.min(p.y, dragZone.sy), w: Math.abs(p.x - dragZone.sx), h: Math.abs(p.y - dragZone.sy)}); drawStages(); }
   });
   cvCrop.addEventListener('pointerup', async e => {
     if(!downOnCrop) return; downOnCrop = false;
-    if(pan){ pan = null; setCrop(crop); return; }
+    if(pan){ pan = null; setCrop(viewer.crop); return; }
     if(dragZone){
       const {x, y, w, h} = dragZone; dragZone = null;
       if(w > 12){ S.zone = {x, y, w, h}; await patchSession({zone: S.zone}); mode = source === 'manual' ? 'manual' : 'target';
         toast(`Zone set · ${fmt(w/17)} px per inch`); frameCatcher(); }
       renderAll(); return;
     }
-    mark(toFrame(e, cvCrop, cropFit()));
+    mark(viewer.toFrameCrop(e));
   });
 
   /* ---------- marking ---------- */
@@ -480,7 +416,7 @@ export async function sessionView(root, id){
 
   return () => {
     document.removeEventListener('keydown', onKey); ro.disconnect(); cancelAnimationFrame(raf);
-    clearTimeout(cropSaveT); if(crop && hasVideo) db('updateSession', S.id, {crop});
+    const crop = viewer.flush(); if(crop && hasVideo) db('updateSession', S.id, {crop});
     vid.pause(); vid.removeAttribute('src'); vid.load();
   };
 }

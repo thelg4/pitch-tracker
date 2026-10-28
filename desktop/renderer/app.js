@@ -1,6 +1,6 @@
 // Boot, hash router, library state and menu dispatch. Routes: #/  ·  #/athlete/:id  ·  #/session/:id
 import { athleteView } from './athlete.js';
-import { sessionView } from './session.js';
+import { sessionView } from './session/session.js';
 import { renderSidebar } from './sidebar.js';
 import { setTitle, setToolbar, setInspector, togglePanel, restorePanels, setPage } from './shell.js';
 import { openSheet } from './sheets.js';
