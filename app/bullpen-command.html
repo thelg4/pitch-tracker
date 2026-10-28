@@ -1,0 +1,859 @@
+<title>Bullpen Command Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: work bench on the left (video + tagger), scoreboard on the right, trend panels and pitch log below. */
+:root{
+  --paper:#ECEFF3; --surface:#FFFFFF; --sunk:#F5F7FA; --ink:#14233B; --muted:#5A6980; --line:#D2D9E3;
+  --accent:#2450A6; --accent-ink:#FFFFFF; --stage:#0E1726; --stage-ink:#C9D3E2;
+  --good:#2C8A57; --warn:#B87810; --bad:#C3343F; --ball:#E8EDF4;
+  --f-display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0C1420; --surface:#142033; --sunk:#101A2A; --ink:#E4E9F1; --muted:#93A1B6; --line:#243349;
+  --accent:#7EA4F0; --accent-ink:#0C1420; --stage:#070D17; --stage-ink:#AEBBD0;
+  --good:#4CC086; --warn:#E3A73C; --bad:#F06571; --ball:#F2F5FA; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0C1420; --surface:#142033; --sunk:#101A2A; --ink:#E4E9F1; --muted:#93A1B6; --line:#243349;
+  --accent:#7EA4F0; --accent-ink:#0C1420; --stage:#070D17; --stage-ink:#AEBBD0;
+  --good:#4CC086; --warn:#E3A73C; --bad:#F06571; --ball:#F2F5FA; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1360px;margin:0 auto;display:grid;gap:18px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
+h1{font-size:30px;line-height:1}
+h2{font-size:19px;text-transform:uppercase;letter-spacing:.05em}
+.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px}
+header.top .sub{color:var(--muted);margin-top:4px;max-width:62ch}
+.setup{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
+.field{display:grid;gap:4px}
+.field select,.field input{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+.field input[type=number]{width:72px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 11px;font-weight:500}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 12px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--bad)}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.banner{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border:1px dashed var(--accent);border-radius:10px;padding:10px 14px;background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+
+.bench{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1000px){.bench{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
+.panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+
+/* Video stage */
+.stage{position:relative;background:var(--stage);border-radius:10px;overflow:hidden;aspect-ratio:16/9;max-width:100%;touch-action:none}
+.stage video{position:absolute;left:0;top:0;width:100%;height:100%;display:block;max-width:none}
+.stage canvas.ov{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+.stage.drag{outline:3px dashed var(--accent);outline-offset:-6px}
+.drop{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;color:var(--stage-ink);text-align:center;padding:20px;pointer-events:none}
+.drop .btn{pointer-events:auto}
+.drop strong{font-family:var(--f-display);font-size:24px;color:#fff;letter-spacing:.02em}
+.loupe{position:absolute;top:10px;right:10px;width:132px;height:132px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.5);pointer-events:none;background:#000}
+.modechip{position:absolute;left:10px;top:10px;background:rgba(7,13,23,.78);color:#fff;border-radius:6px;padding:5px 9px;font-size:12px;font-weight:600;letter-spacing:.03em;pointer-events:none;max-width:calc(100% - 160px)}
+.transport{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.transport input[type=range]{flex:1 1 200px;accent-color:var(--accent);min-width:0}
+.transport .time{font-family:var(--f-mono);font-size:12px;color:var(--muted);min-width:110px;text-align:right}
+.kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--sunk)}
+.hint{color:var(--muted);font-size:12.5px}
+
+/* Tagger */
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.step{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--sunk);display:grid;gap:2px}
+.step b{font-size:13px}
+.step span{font-size:12px;color:var(--muted)}
+.step.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--surface))}
+.step.done span{color:var(--good)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:13px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip[aria-pressed=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.instr{font-size:15px;font-weight:500;min-height:2.9em}
+.zonepick{display:grid;grid-template-columns:auto repeat(3,44px);grid-template-rows:auto repeat(3,34px);gap:4px;align-items:center;justify-content:start}
+.zonepick button{border:1px solid var(--line);background:var(--sunk);border-radius:5px;height:100%}
+.zonepick button:hover{background:color-mix(in srgb,var(--accent) 18%,var(--sunk))}
+.zonepick .cl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:center}
+.edit{border:1px solid var(--accent);border-radius:10px;padding:12px;display:grid;gap:10px;background:color-mix(in srgb,var(--accent) 6%,var(--surface))}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+
+/* Scoreboard */
+.board{display:grid;gap:14px}
+.big{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+.big .score{font-family:var(--f-display);font-size:88px;line-height:.85;font-weight:700}
+.big .grade{display:grid;gap:4px;padding-bottom:6px}
+.pill{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:600}
+.pill.good{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.neutral{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stats>div{background:var(--surface);padding:9px 10px;display:grid;gap:2px}
+.stats .v{font-family:var(--f-mono);font-size:18px;font-weight:500}
+@media (max-width:460px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.insights{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.insights li{display:grid;grid-template-columns:8px 1fr;gap:10px;align-items:start}
+.insights li::before{content:"";width:8px;height:8px;border-radius:2px;margin-top:6px;background:var(--muted)}
+.insights li.bad::before{background:var(--bad)} .insights li.warn::before{background:var(--warn)} .insights li.good::before{background:var(--good)}
+.method{font-size:12.5px;color:var(--muted)}
+.method summary{cursor:pointer;font-weight:600}
+
+/* Trends */
+.trends{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+svg text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+svg .axis{stroke:var(--line)} svg .grid{stroke:var(--line);stroke-dasharray:2 3}
+.legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted)}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+.heat{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));gap:4px;align-items:stretch}
+.heat .c{border-radius:6px;padding:8px 4px;text-align:center;display:grid;gap:1px;min-height:62px;align-content:center}
+.heat .c b{font-family:var(--f-mono);font-size:16px}
+.heat .c span{font-size:11px}
+.heat .rl,.heat .cl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;align-self:center;text-align:center}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td.num,th.num{text-align:right}
+tbody tr.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--sunk)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:0}
+.empty{color:var(--muted);padding:18px;text-align:center;border:1px dashed var(--line);border-radius:8px}
+textarea.csv{width:100%;min-height:140px;font-family:var(--f-mono);font-size:12px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-weight:500;z-index:20}
+@media (prefers-reduced-motion:no-preference){.toast{animation:pop .18s ease-out}@keyframes pop{from{transform:translate(-50%,6px);opacity:.4}}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Bullpen Command Tracker</h1>
+      <div class="sub">Tag where the catcher sets up and where the ball arrives. Every pitch gets a miss distance in inches, a command score, and a direction.</div>
+    </div>
+    <div class="setup">
+      <div class="field"><span class="lbl">Pitcher</span>
+        <div class="seg" id="hand"><button data-v="R">RHP</button><button data-v="L">LHP</button></div></div>
+      <div class="field"><label class="lbl" for="view">Camera</label>
+        <select id="view"><option value="pitcher">Behind pitcher</option><option value="catcher">Behind catcher</option></select></div>
+      <div class="field"><label class="lbl" for="hitR">Hit radius (in)</label>
+        <input id="hitR" type="number" min="2" max="12" step="0.5"></div>
+      <div class="field"><label class="lbl" for="fps">Video fps</label>
+        <select id="fps"><option>30</option><option>60</option><option>120</option><option>240</option></select></div>
+    </div>
+  </header>
+
+  <div class="banner" id="autoBanner" hidden>
+    <div id="autoTxt"></div>
+    <button class="btn primary" id="autoLoad">Load auto-tags</button>
+  </div>
+
+  <div class="banner" id="exampleBanner" hidden>
+    <div><b>You're looking at an example bullpen.</b> These 32 pitches are sample data. Load your own bullpen video to start tagging.</div>
+    <button class="btn primary" id="bannerLoad">Load bullpen video</button>
+  </div>
+
+  <section class="bench">
+    <div class="panel">
+      <div class="stage" id="stage">
+        <video id="vid" playsinline muted preload="auto"></video>
+        <canvas class="ov" id="ov"></canvas>
+        <canvas class="loupe" id="loupe" width="264" height="264" hidden></canvas>
+        <div class="modechip" id="modechip" hidden></div>
+        <div class="drop" id="drop">
+          <strong>Drop a bullpen video here</strong>
+          <span>Best angle: straight behind the pitcher or behind the catcher, with the whole plate in frame.</span>
+          <button class="btn primary" id="pick">Choose video</button>
+        </div>
+      </div>
+      <input type="file" id="file" accept="video/*" hidden>
+      <div class="transport">
+        <button class="btn sm" id="play" title="Play / pause (Space)">Play</button>
+        <button class="btn sm" id="back10" title="Back 10 frames (Shift + ←)">−10</button>
+        <button class="btn sm" id="back1" title="Back 1 frame (←)">−1</button>
+        <button class="btn sm" id="fwd1" title="Forward 1 frame (→)">+1</button>
+        <button class="btn sm" id="fwd10" title="Forward 10 frames (Shift + →)">+10</button>
+        <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Video position">
+        <select id="rate" class="btn sm" aria-label="Playback speed"><option value="1">1×</option><option value="0.5">0.5×</option><option value="0.25" selected>0.25×</option><option value="0.1">0.1×</option></select>
+        <span class="time" id="time">0:00.00</span>
+      </div>
+      <div class="row hint">
+        <span><span class="kbd">Space</span> play</span><span><span class="kbd">←</span><span class="kbd">→</span> frame step</span>
+        <span><span class="kbd">G</span> glove</span><span><span class="kbd">M</span> manual</span><span><span class="kbd">Z</span> zone</span><span><span class="kbd">⌫</span> undo mark</span>
+        <span>Scroll to zoom · <span class="kbd">Shift</span>+drag to pan</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Zoom</span>
+        <button class="btn sm" id="zoomBox" title="Drag a box on the video to zoom into it (B)">Zoom to box</button>
+        <button class="btn sm" id="zoomPlate" title="Frame the plate and catcher (P)">Zoom to plate</button>
+        <button class="btn sm" id="zoomFull" title="Show the whole frame (F)">Full frame</button>
+        <label style="margin-left:auto;display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="showAll" checked> Show all pitches</label>
+        <button class="btn sm" id="newClip">Load another clip</button>
+      </div>
+    </div>
+
+    <div class="panel" id="tagger">
+      <div class="panel-h"><h2>Tag pitch <span class="num" id="nextN">#1</span></h2><span class="lbl" id="clipName"></span></div>
+      <div class="steps">
+        <div class="step" id="stZone"><b>Zone</b><span></span></div>
+        <div class="step" id="stTarget"><b>Target</b><span></span></div>
+        <div class="step" id="stLoc"><b>Location</b><span></span></div>
+      </div>
+      <div class="instr" id="instr"></div>
+      <div class="field"><span class="lbl">Pitch type</span><div class="chips" id="types"></div></div>
+      <div class="field"><span class="lbl">Target from</span>
+        <div class="seg" id="source"><button data-v="glove">Catcher's glove</button><button data-v="manual">Manual target</button></div>
+      </div>
+      <div id="manualBox" class="field" hidden>
+        <span class="lbl">Quick manual target (or click the video)</span>
+        <div class="zonepick" id="zonepick"></div>
+      </div>
+      <div class="row">
+        <button class="btn sm" id="undoMark">Undo mark</button>
+        <button class="btn sm" id="redrawZone">Redraw zone</button>
+        <button class="btn sm danger" id="clearMarks">Clear marks</button>
+      </div>
+      <div class="edit" id="queueBox" hidden></div>
+      <div class="edit" id="editBox" hidden></div>
+      <p class="hint" style="margin:0">Catcher set up in the wrong spot? Mark the glove, then switch to <b>Manual target</b> and click where the ball was supposed to go. The manual target is what gets scored; the glove spot is kept so you can see how far off the setup was.</p>
+    </div>
+  </section>
+
+  <section class="bench">
+    <div class="panel board">
+      <div class="panel-h"><h2>Command score</h2><span class="lbl" id="sessionLbl"></span></div>
+      <div class="big">
+        <div class="score num" id="bigScore">–</div>
+        <div class="grade"><span id="gradePill" class="pill neutral">–</span><span class="hint" id="gradeTxt"></span></div>
+      </div>
+      <div class="stats">
+        <div><span class="lbl">Hit rate</span><span class="v" id="sHit">–</span></div>
+        <div><span class="lbl">Avg miss</span><span class="v" id="sMiss">–</span></div>
+        <div><span class="lbl">In zone</span><span class="v" id="sZone">–</span></div>
+        <div><span class="lbl">Pitches</span><span class="v" id="sN">–</span></div>
+      </div>
+      <details class="method"><summary>How the score works</summary>
+        <p>Miss distance is measured in inches from the target to where the ball is caught, using the 17-inch plate width from your zone box as the ruler. A pitch within a third of the hit radius scores 100. The score falls in a straight line to 0 at three times the hit radius. With the default 6" radius, a 6" miss scores 75 and anything 18" or more scores 0. The command score is the average across all tagged pitches, and the grade puts it on the 20–80 scouting scale.</p>
+      </details>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h2>What the misses say</h2></div>
+      <ul class="insights" id="insights"></ul>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2>Trends</h2>
+      <div class="field" style="grid-auto-flow:column;align-items:center;gap:8px"><label class="lbl" for="filter">Pitch type</label><select id="filter" class="btn sm"></select></div>
+    </div>
+    <div class="trends">
+      <div class="field"><span class="lbl">Miss pattern around the target</span><div id="scatter"></div><div class="legend" id="legend"></div></div>
+      <div class="field"><span class="lbl">Hit rate by target location</span><div id="heat"></div><span class="hint">Targets grouped by zone third, seen from the mound. Arm side is the side of the pitcher's throwing hand.</span></div>
+      <div class="field"><span class="lbl">Score over the session (5-pitch rolling)</span><div id="trend"></div></div>
+    </div>
+    <div class="tbl" id="typeTbl"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-h"><h2>Pitch log</h2>
+      <div class="row"><button class="btn sm" id="copyCsv">Copy CSV</button><button class="btn sm danger" id="newSession">New session</button></div>
+    </div>
+    <div class="tbl" id="log"></div>
+    <textarea class="csv" id="csvBox" hidden readonly aria-label="CSV export"></textarea>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const TYPES = [['FB','4-Seam'],['SI','Sinker'],['CT','Cutter'],['SL','Slider'],['SW','Sweeper'],['CB','Curve'],['CH','Change'],['SP','Splitter']];
+const TCOL = {FB:'#3D74DB',SI:'#139A9A',CT:'#8A5CD6',SL:'#DD8629',SW:'#C55CAE',CB:'#D2475B',CH:'#3C9C50',SP:'#9F7E3C'};
+const TNAME = Object.fromEntries(TYPES);
+const STORE = 'bullpen-command-v1';
+const clamp = (v,a,b) => Math.min(b,Math.max(a,v));
+const fmt = (v,d=1) => (Math.round(v*10**d)/10**d).toFixed(d);
+
+/* ---------- state ---------- */
+let S = load() || exampleSession();
+let draft = newDraft();
+let mode = 'target';          // zone | target | manual | location
+let source = 'glove';         // glove | manual
+let curType = 'FB';
+let selectedId = null, editField = null, confirmDel = false, confirmNew = false;
+let hasVideo = false, filter = 'ALL';
+
+function newDraft(){ return {glove:null, manual:null, loc:null}; }
+function blankSession(settings){ return {settings: settings || {hand:'R',view:'pitcher',hitR:6,fps:30}, zone:null, clip:'', pitches:[], example:false, seq:0}; }
+function load(){ try{ const s = JSON.parse(localStorage.getItem(STORE)); return s && Array.isArray(s.pitches) ? s : null; }catch(e){ return null; } }
+function save(){ if(S.example) return; try{ localStorage.setItem(STORE, JSON.stringify(S)); }catch(e){} }
+
+function exampleSession(){
+  // Seeded sample: a RHP whose fastball and changeup leak arm side/up and whose spread grows late.
+  let a = 7; const rnd = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a>>>15, 1|a); t = t + Math.imul(t ^ t>>>7, 61|t) ^ t; return ((t ^ t>>>14)>>>0)/4294967296; };
+  const g = () => { let u=0,v=0; while(!u)u=rnd(); while(!v)v=rnd(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+  const s = blankSession(); s.example = true; s.clip = 'Example bullpen';
+  const zone = {x:555,y:290,w:170,h:230}; s.zone = zone; const ppi = 10;
+  const bias = {FB:[2.6,2.2,3.2], SL:[-1.4,-2.4,4.2], CH:[2.0,2.8,3.8], CB:[0.3,-3.2,4.8]};
+  const plan = 'FB FB FB SL FB CH FB SL FB FB CB SL FB CH FB SL CH FB CB FB SL FB CH FB SL CB FB CH SL FB CB FB'.split(' ');
+  plan.forEach((type,i) => {
+    const col = Math.floor(rnd()*3), row = type==='CB'||type==='CH' ? 2 : Math.floor(rnd()*3);
+    const tgt = {x: zone.x + zone.w*(col+.25+rnd()*.5)/3, y: zone.y + zone.h*(row+.25+rnd()*.5)/3};
+    const [bx,by,sp] = bias[type], fat = 1 + 0.75*i/plan.length;
+    const arm = bx + g()*sp*fat*0.75, up = by + g()*sp*fat*0.75;
+    const p = {id:'p'+(++s.seq), n:i+1, type, glove:{...tgt,t:0}, manual:null, loc:{x:tgt.x+arm*ppi, y:tgt.y-up*ppi, t:0}, zone:{...zone}, clip:s.clip};
+    if(i===6||i===13||i===21||i===27){ // catcher drifted; pitcher was throwing to a different spot
+      p.manual = {...tgt,t:0}; p.glove = {x:tgt.x+(rnd()-.5)*90, y:tgt.y-50-rnd()*30, t:0};
+    }
+    s.pitches.push(p);
+  });
+  return s;
+}
+
+/* ---------- geometry & scoring ---------- */
+const armSign = () => (S.settings.hand==='R'?1:-1) * (S.settings.view==='pitcher'?1:-1);
+function metrics(p){
+  const z = p.zone, ppi = z.w/17, t = p.manual || p.glove, a = armSign(), h = S.settings.hitR;
+  const dx = (p.loc.x - t.x)/ppi, dy = (t.y - p.loc.y)/ppi;
+  const arm = dx*a, up = dy, d = Math.hypot(dx,dy);
+  const score = Math.round(100*clamp((3*h - d)/(3*h - h/3), 0, 1));
+  const br = 1.45*ppi;
+  const inZone = p.loc.x>=z.x-br && p.loc.x<=z.x+z.w+br && p.loc.y>=z.y-br && p.loc.y<=z.y+z.h+br;
+  const tc = Math.floor((t.x-z.x)/(z.w/3)), tr = Math.floor((t.y-z.y)/(z.h/3));
+  const outT = tc<0||tc>2||tr<0||tr>2, c = clamp(tc,0,2);
+  const setupOff = p.manual && p.glove ? Math.hypot(p.manual.x-p.glove.x, p.manual.y-p.glove.y)/ppi : null;
+  return {arm, up, d, score, hit: d<=h, inZone, armCol: a>0 ? c : 2-c, row: clamp(tr,0,2), outT, setupOff, dir: dirLabel(arm,up,d<=h)};
+}
+const DIRS = ['Arm side','Up & arm side','Up','Up & glove side','Glove side','Down & glove side','Down','Down & arm side'];
+function dirLabel(arm,up,hit){ if(hit) return 'On target'; const k = Math.round(Math.atan2(up,arm)/(Math.PI/4)); return DIRS[(k+8)%8]; }
+function summary(list){
+  const ms = list.map(metrics), n = ms.length;
+  if(!n) return {n:0};
+  const avg = f => ms.reduce((s,m)=>s+f(m),0)/n;
+  return {n, ms, score: avg(m=>m.score), hit: avg(m=>m.hit?1:0), d: avg(m=>m.d), arm: avg(m=>m.arm), up: avg(m=>m.up), zone: avg(m=>m.inZone?1:0)};
+}
+const grade = s => clamp(20 + Math.round(s*0.6/5)*5, 20, 80);
+const tone = s => s>=70 ? 'good' : s>=50 ? 'warn' : 'bad';
+const GRADE_TXT = {80:'Elite command',75:'Plus-plus',70:'Plus',65:'Above average',60:'Above average',55:'Average',50:'Average',45:'Below average',40:'Below average',35:'Well below',30:'Well below',25:'Poor',20:'Poor'};
+function sideWord(v, pos, neg){ return Math.abs(v)<0.75 ? null : `${fmt(Math.abs(v))}" ${v>0?pos:neg}`; }
+
+/* ---------- video ---------- */
+const vid = $('#vid'), ov = $('#ov'), stage = $('#stage'), loupe = $('#loupe');
+const frameW = () => vid.videoWidth || S.frame?.w || 1280, frameH = () => vid.videoHeight || S.frame?.h || 720;
+function openFile(f){
+  if(!f || !f.type.startsWith('video')) { toast('That file is not a video. Choose an .mp4 or .mov.'); return; }
+  if(S.example){ S = blankSession(S.settings); }
+  S.clip = f.name; vid.src = URL.createObjectURL(f); vid.playbackRate = +$('#rate').value;
+  hasVideo = true; draft = newDraft(); selectedId = null;
+  mode = S.zone ? (source==='manual'?'manual':'target') : 'zone';
+  save(); renderAll();
+}
+// Tags store frame-pixel coordinates; if this copy of the clip has a different resolution, scale them to match.
+function rescaleTo(w, h){
+  const f = S.frame;
+  if(f && f.w && f.w !== w){
+    const k = w/f.w, pt = o => o && Object.assign(o, {x:o.x*k, y:o.y*k}), box = b => b && {x:b.x*k, y:b.y*k, w:b.w*k, h:b.h*k};
+    S.zone = box(S.zone); S.pitches.forEach(p => { pt(p.glove); pt(p.manual); pt(p.loc); p.zone = box(p.zone); });
+    (S.queue || []).forEach(q => pt(q.hint));
+  }
+  S.frame = {w, h}; save();
+}
+vid.addEventListener('loadedmetadata', () => { rescaleTo(vid.videoWidth, vid.videoHeight); view = null; $('#scrub').max = vid.duration; vid.currentTime = 0; if(S.zone) zoomToPlate(); sizeCanvas(); gotoQueue(); });
+vid.addEventListener('timeupdate', syncTime); vid.addEventListener('seeked', () => { syncTime(); draw(); });
+vid.addEventListener('play', () => $('#play').textContent='Pause'); vid.addEventListener('pause', () => $('#play').textContent='Play');
+function syncTime(){ $('#scrub').value = vid.currentTime; const t=vid.currentTime; $('#time').textContent = `${Math.floor(t/60)}:${(t%60).toFixed(2).padStart(5,'0')} · f${Math.round(t*S.settings.fps)}`; }
+function step(n){ if(!hasVideo) return; vid.pause(); vid.currentTime = clamp(vid.currentTime + n/S.settings.fps, 0, vid.duration||0); }
+$('#play').onclick = () => hasVideo && (vid.paused ? vid.play() : vid.pause());
+$('#back10').onclick = () => step(-10); $('#back1').onclick = () => step(-1); $('#fwd1').onclick = () => step(1); $('#fwd10').onclick = () => step(10);
+$('#scrub').oninput = e => { if(hasVideo){ vid.pause(); vid.currentTime = +e.target.value; } };
+$('#rate').onchange = e => vid.playbackRate = +e.target.value;
+$('#pick').onclick = $('#bannerLoad').onclick = $('#newClip').onclick = () => $('#file').click();
+$('#file').onchange = e => { openFile(e.target.files[0]); e.target.value=''; };
+['dragenter','dragover'].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); stage.classList.add('drag'); }));
+['dragleave','drop'].forEach(ev => stage.addEventListener(ev, e => { e.preventDefault(); stage.classList.remove('drag'); }));
+stage.addEventListener('drop', e => openFile(e.dataTransfer.files[0]));
+
+/* ---------- overlay ---------- */
+function sizeCanvas(){ const r = ov.getBoundingClientRect(), dpr = devicePixelRatio||1; ov.width = r.width*dpr; ov.height = r.height*dpr; draw(); }
+new ResizeObserver(sizeCanvas).observe(stage);
+// The canvas covers the whole stage. `view` is the part of the frame shown (null = whole frame), fitted inside the stage.
+let view = null, zoomBoxOn = false, pan = null;
+function fit(){
+  const r = ov.getBoundingClientRect(), v = view || {x:0,y:0,w:frameW(),h:frameH()}, s = Math.min(r.width/v.w, r.height/v.h);
+  return {s, ox:(r.width-v.w*s)/2 - v.x*s, oy:(r.height-v.h*s)/2 - v.y*s};
+}
+function layoutVideo(){ const f = fit(); Object.assign(vid.style, {width:frameW()*f.s+'px', height:frameH()*f.s+'px', left:f.ox+'px', top:f.oy+'px'}); }
+function toFrame(e){ const r = ov.getBoundingClientRect(), f = fit(); return {x:(e.clientX-r.left-f.ox)/f.s, y:(e.clientY-r.top-f.oy)/f.s}; }
+function setView(cx, cy, w){
+  const r = ov.getBoundingClientRect(), asp = r.width/r.height || 16/9;
+  w = clamp(w, frameW()/20, Math.max(frameW(), frameH()*asp));
+  const h = w/asp;
+  if(w >= frameW() && h >= frameH()){ view = null; draw(); return; }
+  view = {x:cx-w/2, y:cy-h/2, w, h}; draw();
+}
+function zoomAt(pt, factor){ const v = view || {x:0,y:0,w:frameW(),h:frameH()}; const k = 1/factor; setView(pt.x + (v.x+v.w/2-pt.x)*k, pt.y + (v.y+v.h/2-pt.y)*k, Math.max(v.w, v.h*(ov.clientWidth/ov.clientHeight))*k); }
+function zoomToPlate(){
+  if(!S.zone){ toast('Draw the strike zone first, then zoom to it. Use "Zoom to box" to get close enough to draw it.'); return; }
+  const z = S.zone, r = ov.getBoundingClientRect(), asp = r.width/r.height || 16/9;
+  setView(z.x+z.w/2, z.y+z.h/2, Math.max(z.w*5, z.h*2.4*asp));
+}
+ov.addEventListener('wheel', e => { if(!hasVideo) return; e.preventDefault(); zoomAt(toFrame(e), e.deltaY < 0 ? 1.2 : 1/1.2); }, {passive:false});
+let dragZone = null, hoverPt = null;
+
+function draw(){
+  layoutVideo();
+  const c = ov.getContext('2d'), dpr = devicePixelRatio||1, f = fit();
+  c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,ov.width,ov.height);
+  if(!hasVideo){
+    if(!S.example) return;
+    c.fillStyle = 'rgba(255,255,255,.05)'; c.fillRect(f.ox,f.oy,frameW()*f.s,frameH()*f.s);
+  }
+  c.translate(f.ox,f.oy); c.scale(f.s,f.s); const lw = 1/f.s;
+  const z = dragZone || S.zone;
+  if(z){
+    c.strokeStyle = 'rgba(255,255,255,.9)'; c.lineWidth = 2*lw; c.setLineDash([6*lw,4*lw]); c.strokeRect(z.x,z.y,z.w,z.h); c.setLineDash([]);
+    c.strokeStyle = 'rgba(255,255,255,.28)'; c.lineWidth = lw; c.beginPath();
+    for(let i=1;i<3;i++){ c.moveTo(z.x+z.w*i/3,z.y); c.lineTo(z.x+z.w*i/3,z.y+z.h); c.moveTo(z.x,z.y+z.h*i/3); c.lineTo(z.x+z.w,z.y+z.h*i/3); }
+    c.stroke();
+    c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `${12*lw}px IBM Plex Mono, monospace`; c.fillText('17" plate width', z.x, z.y-6*lw);
+  }
+  const sel = S.pitches.find(p=>p.id===selectedId);
+  if($('#showAll').checked) S.pitches.forEach(p => { if(p!==sel) drawPitch(c,p,lw,.35); });
+  if(sel) drawPitch(c,sel,lw,1);
+  if(!sel) drawPitch(c,{...draft,type:curType},lw,1);
+  const qh = queueOn() && mode==='location' && S.queue[S.qi].hint;
+  if(qh){ c.strokeStyle='#FFD24A'; c.lineWidth=1.5*lw; c.setLineDash([3*lw,3*lw]); c.beginPath(); c.arc(qh.x,qh.y,(S.zone?S.zone.w/17:2)*4,0,7); c.stroke(); c.setLineDash([]); }
+  if(!hasVideo && S.example){
+    c.setTransform(dpr,0,0,dpr,0,0); c.fillStyle='rgba(201,211,226,.8)'; c.font='600 13px IBM Plex Sans, sans-serif';
+    c.fillText('Example bullpen · no video loaded', f.ox+14, f.oy+frameH()*f.s-16);
+  }
+}
+function drawPitch(c,p,lw,alpha){
+  const col = TCOL[p.type] || '#fff', ppi = (p.zone||S.zone||{w:170}).w/17, ballR = 1.45*ppi;
+  c.globalAlpha = alpha;
+  const t = p.manual || p.glove;
+  if(p.glove){ // catcher's glove: ring
+    c.strokeStyle = p.manual ? 'rgba(255,255,255,.7)' : '#fff'; c.lineWidth = 2.5*lw; c.setLineDash(p.manual?[4*lw,3*lw]:[]);
+    c.beginPath(); c.arc(p.glove.x,p.glove.y,ballR*2.2,0,7); c.stroke(); c.setLineDash([]);
+  }
+  if(p.manual){ // manual target: crosshair
+    c.strokeStyle = '#FFD24A'; c.lineWidth = 2.5*lw; const r = ballR*2;
+    c.beginPath(); c.moveTo(p.manual.x-r,p.manual.y); c.lineTo(p.manual.x+r,p.manual.y); c.moveTo(p.manual.x,p.manual.y-r); c.lineTo(p.manual.x,p.manual.y+r); c.stroke();
+    c.beginPath(); c.arc(p.manual.x,p.manual.y,r*.6,0,7); c.stroke();
+  }
+  if(p.loc){
+    if(t){ c.strokeStyle = col; c.lineWidth = 2*lw; c.beginPath(); c.moveTo(t.x,t.y); c.lineTo(p.loc.x,p.loc.y); c.stroke(); }
+    c.fillStyle = col; c.strokeStyle = '#fff'; c.lineWidth = 1.5*lw; c.beginPath(); c.arc(p.loc.x,p.loc.y,ballR,0,7); c.fill(); c.stroke();
+  }
+  c.globalAlpha = 1;
+}
+function drawLoupe(e){
+  const marking = hasVideo && (editField || ['target','manual','location'].includes(mode));
+  loupe.hidden = !marking || !e; if(loupe.hidden) return;
+  const p = toFrame(e), c = loupe.getContext('2d'), span = frameW()/14;
+  c.fillStyle='#000'; c.fillRect(0,0,264,264);
+  c.drawImage(vid, p.x-span/2, p.y-span/2, span, span, 0, 0, 264, 264);
+  c.strokeStyle='#FFD24A'; c.lineWidth=2; c.beginPath(); c.moveTo(132,112); c.lineTo(132,152); c.moveTo(112,132); c.lineTo(152,132); c.stroke();
+}
+ov.addEventListener('pointerdown', e => {
+  if(!hasVideo) return;
+  if(e.shiftKey || e.button===1){ e.preventDefault(); pan = {x:e.clientX, y:e.clientY, v:{...(view || {x:0,y:0,w:frameW(),h:frameH()})}, s:fit().s, moved:false}; ov.setPointerCapture(e.pointerId); return; }
+  if(zoomBoxOn || (mode==='zone' && !editField)){ const p = toFrame(e); dragZone = {x:p.x,y:p.y,w:0,h:0,sx:p.x,sy:p.y}; ov.setPointerCapture(e.pointerId); }
+});
+ov.addEventListener('pointermove', e => {
+  if(pan){ const dx = (e.clientX-pan.x)/pan.s, dy = (e.clientY-pan.y)/pan.s; pan.moved = true;
+    view = {...pan.v, x:pan.v.x-dx, y:pan.v.y-dy}; draw(); return; }
+  if(dragZone){ const p = toFrame(e); Object.assign(dragZone,{x:Math.min(p.x,dragZone.sx),y:Math.min(p.y,dragZone.sy),w:Math.abs(p.x-dragZone.sx),h:Math.abs(p.y-dragZone.sy)}); draw(); }
+  drawLoupe(e);
+});
+ov.addEventListener('pointerleave', () => loupe.hidden = true);
+ov.addEventListener('pointerup', e => {
+  if(!hasVideo) return;
+  if(pan){ pan = null; return; }
+  if(dragZone && zoomBoxOn){
+    const {x,y,w,h} = dragZone; dragZone = null; zoomBoxOn = false;
+    if(w > 8 && h > 8) setView(x+w/2, y+h/2, Math.max(w, h*(ov.clientWidth/ov.clientHeight)));
+    renderAll(); return;
+  }
+  if(dragZone){
+    const {x,y,w,h} = dragZone; dragZone = null;
+    if(w > 12){ S.zone = {x,y,w,h}; mode = source==='manual'?'manual':'target'; toast(`Zone set · ${fmt(w/17,1)} px per inch`); save(); zoomToPlate(); gotoQueue(); }
+    renderAll(); return;
+  }
+  mark(toFrame(e));
+});
+
+function mark(pt){
+  pt.t = hasVideo ? +vid.currentTime.toFixed(3) : 0;
+  const sel = S.pitches.find(p=>p.id===selectedId);
+  if(sel && editField){ sel[editField] = pt; delete sel.flag; editField = null; save(); renderAll(); return; }
+  if(sel) return;
+  if(!S.zone){ mode='zone'; toast('Draw the strike zone first so misses can be measured in inches.'); renderAll(); return; }
+  if(mode==='target'){ draft.glove = pt; mode = 'location'; if(queueOn()) vid.currentTime = S.queue[S.qi].catch_t; }
+  else if(mode==='manual'){ draft.manual = pt; mode = 'location'; if(queueOn()) vid.currentTime = S.queue[S.qi].catch_t; }
+  else if(mode==='location'){ draft.loc = pt; commit(); return; }
+  renderAll();
+}
+function commit(){
+  const p = {id:'p'+(++S.seq), n:S.pitches.length+1, type:curType, glove:draft.glove, manual:draft.manual, loc:draft.loc, zone:{...S.zone}, clip:S.clip};
+  const fromQueue = queueOn(); if(fromQueue){ p.auto = true; S.qi++; }
+  S.pitches.push(p); draft = newDraft(); mode = source==='manual' ? 'manual' : 'target';
+  const m = metrics(p); toast(`#${p.n} ${p.type}: ${m.hit?'hit':'miss'} · ${fmt(m.d)}" · ${m.score} pts`);
+  save(); if(fromQueue) gotoQueue(); renderAll();
+}
+function setSource(v){
+  source = v;
+  if(!selectedId && hasVideo && S.zone) mode = v==='manual' ? (draft.manual?'location':'manual') : (draft.glove||draft.manual?'location':'target');
+  if(selectedId && v==='manual') editField = 'manual';
+  renderAll();
+}
+function undoMark(){
+  if(selectedId){ selectedId=null; editField=null; renderAll(); return; }
+  if(draft.loc) draft.loc=null;
+  else if(mode==='location' && draft.manual && source==='manual'){ draft.manual=null; mode='manual'; }
+  else if(mode==='location' && draft.glove){ draft.glove=null; draft.manual=null; mode = source==='manual'?'manual':'target'; }
+  else if(mode==='manual' && draft.glove){ draft.glove=null; }
+  renderAll();
+}
+function manualPreset(armCol,row){
+  const z = (S.pitches.find(p=>p.id===selectedId)||{}).zone || S.zone; if(!z){ toast('Draw the strike zone first.'); return; }
+  const col = armSign()>0 ? armCol : 2-armCol;
+  if(selectedId) editField = 'manual'; else if(mode!=='manual') { source='manual'; mode='manual'; }
+  mark({x:z.x+z.w*(col+.5)/3, y:z.y+z.h*(row+.5)/3});
+}
+
+/* ---------- tagger UI ---------- */
+$('#types').innerHTML = TYPES.map(([k,n]) => `<button class="chip" data-t="${k}"><i style="background:${TCOL[k]}"></i>${k} <span class="hint">${n}</span></button>`).join('');
+$('#types').onclick = e => { const b = e.target.closest('[data-t]'); if(!b) return; const sel = S.pitches.find(p=>p.id===selectedId); if(sel){ sel.type=b.dataset.t; save(); } else curType=b.dataset.t; renderAll(); };
+$('#source').onclick = e => { const b = e.target.closest('button'); b && setSource(b.dataset.v); };
+$('#undoMark').onclick = undoMark;
+$('#redrawZone').onclick = () => { if(!hasVideo){ toast('Load a video to draw a zone.'); return; } selectedId=null; editField=null; mode='zone'; renderAll(); };
+(function(){
+  const rows = ['Up','Mid','Down'], cols = ['Glove','Mid','Arm'];
+  let h = '<span></span>' + cols.map(c=>`<span class="cl">${c}</span>`).join('');
+  rows.forEach((r,ri) => { h += `<span class="cl">${r}</span>` + cols.map((c,ci)=>`<button data-c="${ci}" data-r="${ri}" aria-label="${r} ${c} side"></button>`).join(''); });
+  $('#zonepick').innerHTML = h;
+  $('#zonepick').onclick = e => { const b = e.target.closest('button'); b && manualPreset(+b.dataset.c, +b.dataset.r); };
+})();
+
+function renderTagger(){
+  const sel = S.pitches.find(p=>p.id===selectedId);
+  $('#nextN').textContent = sel ? `#${sel.n}` : `#${S.pitches.length+1}`;
+  $('#clipName').textContent = S.clip || '';
+  const typeNow = sel ? sel.type : curType;
+  document.querySelectorAll('#types [data-t]').forEach(b => b.setAttribute('aria-pressed', b.dataset.t===typeNow));
+  document.querySelectorAll('#source button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v===source));
+  $('#manualBox').hidden = source!=='manual';
+  const st = (id,on,done,txt) => { const el=$(id); el.classList.toggle('on',on); el.classList.toggle('done',done); el.querySelector('span').textContent=txt; };
+  const zoneTxt = S.zone ? `${fmt(S.zone.w/17)} px/in` : 'Not set';
+  const tgt = draft.manual ? 'Manual ✓' : draft.glove ? 'Glove ✓' : 'Waiting';
+  st('#stZone', mode==='zone', !!S.zone, zoneTxt);
+  st('#stTarget', !sel && (mode==='target'||mode==='manual'), !!(draft.glove||draft.manual), tgt);
+  st('#stLoc', !sel && mode==='location', false, draft.loc ? '✓' : 'Waiting');
+  let ins, chip;
+  if(!hasVideo){ ins = S.example ? 'Load a bullpen video to start tagging. The example pitches will be cleared.' : 'Load the video for this bullpen to keep tagging.'; chip=null; }
+  else if(sel && editField){ ins = {glove:"Click the catcher's glove on the video.", manual:'Click the intended target, or pick a zone third below.', loc:'Click where the ball was caught.'}[editField]; chip = 'Editing #'+sel.n; }
+  else if(sel){ ins = `Editing pitch #${sel.n}. Use the buttons below to re-mark it.`; chip = null; }
+  else if(zoomBoxOn){ ins = 'Drag a box around the area you want to zoom into.'; chip='Drag to zoom'; }
+  else if(mode==='zone'){ ins = 'Zoom in on the plate first (scroll, or "Zoom to box"). Then drag a box over the strike zone, edge to edge across the plate. Its width is the 17-inch ruler.'; chip='Draw zone'; }
+  else if(mode==='target'){ ins = "Scrub to the frame where the catcher is set, then click the center of the glove."; chip='Click glove setup'; }
+  else if(mode==='manual'){ ins = 'Click the intended target on the video, or pick a zone third below.'; chip='Click manual target'; }
+  else { ins = 'Step forward to the catch, then click where the ball hits the glove.'; chip='Click catch location'; }
+  $('#instr').textContent = ins;
+  $('#modechip').hidden = !chip; $('#modechip').textContent = chip || '';
+  $('#drop').hidden = hasVideo;
+  $('#drop strong').textContent = S.example || !S.pitches.length ? 'Drop a bullpen video here' : 'Reload this bullpen video to keep tagging';
+  $('#undoMark').textContent = sel ? 'Done editing' : 'Undo mark';
+  renderEdit(sel);
+}
+function renderEdit(p){
+  const box = $('#editBox'); box.hidden = !p; if(!p) return;
+  const m = metrics(p);
+  box.innerHTML = `
+    <div class="panel-h"><b>Pitch #${p.n} · ${TNAME[p.type]}</b><span class="pill ${tone(m.score)}">${m.score} pts · ${fmt(m.d)}" ${m.dir.toLowerCase()}</span></div>
+    <div class="row">
+      <button class="btn sm" data-a="jumpT">Go to setup frame</button>
+      <button class="btn sm" data-a="jumpL">Go to catch frame</button>
+    </div>
+    <div class="row">
+      <button class="btn sm" data-a="glove" ${hasVideo?'':'disabled'}>Re-mark glove</button>
+      <button class="btn sm" data-a="manual">${p.manual?'Move':'Set'} manual target</button>
+      ${p.manual && p.glove ? '<button class="btn sm" data-a="clearM">Use glove instead</button>' : ''}
+      <button class="btn sm" data-a="loc" ${hasVideo?'':'disabled'}>Re-mark location</button>
+      <button class="btn sm danger" data-a="del">${confirmDel?'Tap again to delete':'Delete'}</button>
+    </div>
+    ${m.setupOff!=null ? `<span class="hint">Catcher set up ${fmt(m.setupOff)}" from the intended target.</span>` : ''}`;
+  box.onclick = e => {
+    const a = e.target.closest('[data-a]')?.dataset.a; if(!a) return;
+    if(a==='jumpT' && hasVideo){ vid.currentTime = (p.manual||p.glove).t; }
+    else if(a==='jumpL' && hasVideo){ vid.currentTime = p.loc.t; }
+    else if(a==='glove'||a==='loc'){ editField = a; }
+    else if(a==='manual'){ editField='manual'; source='manual'; if(!hasVideo) toast('Pick a zone third below to set the manual target.'); }
+    else if(a==='clearM'){ p.manual = null; save(); }
+    else if(a==='del'){ if(!confirmDel){ confirmDel=true; } else { S.pitches = S.pitches.filter(x=>x!==p); S.pitches.forEach((x,i)=>x.n=i+1); selectedId=null; confirmDel=false; save(); } }
+    if(a!=='del') confirmDel=false;
+    renderAll();
+  };
+}
+
+/* ---------- scoreboard & insights ---------- */
+function renderBoard(){
+  const s = summary(S.pitches);
+  $('#exampleBanner').hidden = !S.example;
+  $('#sessionLbl').textContent = S.example ? 'Example data' : (S.clip || '');
+  if(!s.n){
+    $('#bigScore').textContent='–'; $('#gradePill').className='pill neutral'; $('#gradePill').textContent='No pitches yet';
+    $('#gradeTxt').textContent='Tag a pitch to get a score.'; ['#sHit','#sMiss','#sZone','#sN'].forEach(i=>$(i).textContent='–');
+    $('#insights').innerHTML = '<li>Trends show up here after a few tagged pitches.</li>'; return;
+  }
+  const sc = Math.round(s.score), gr = grade(s.score);
+  $('#bigScore').textContent = sc; $('#bigScore').style.color = `var(--${tone(sc)})`;
+  $('#gradePill').className = 'pill '+tone(sc); $('#gradePill').textContent = `${gr} grade`;
+  $('#gradeTxt').textContent = GRADE_TXT[gr];
+  $('#sHit').textContent = Math.round(s.hit*100)+'%'; $('#sMiss').textContent = fmt(s.d)+'"';
+  $('#sZone').textContent = Math.round(s.zone*100)+'%'; $('#sN').textContent = s.n;
+  $('#insights').innerHTML = insights(s).map(([t,c])=>`<li class="${c}">${t}</li>`).join('');
+}
+function insights(s){
+  const out = [], h = S.settings.hitR;
+  if(s.n < 5) return [['Tag at least 5 pitches to see reliable trends.','']];
+  const bias = [sideWord(s.arm,'arm side','glove side'), sideWord(s.up,'up','down')].filter(Boolean);
+  out.push(bias.length ? [`Average miss lands <b>${bias.join(' and ')}</b> of the target.`, Math.hypot(s.arm,s.up)>2.5?'bad':'warn'] : ['No consistent directional bias. Misses scatter evenly around the target.','good']);
+  const misses = s.ms.filter(m=>!m.hit);
+  if(misses.length >= 3){
+    const cnt = {}; misses.forEach(m=>cnt[m.dir]=(cnt[m.dir]||0)+1);
+    const [dir,c] = Object.entries(cnt).sort((a,b)=>b[1]-a[1])[0];
+    out.push([`Most common miss: <b>${dir.toLowerCase()}</b>, ${c} of ${misses.length} misses (${Math.round(c/misses.length*100)}%).`, c/misses.length>=.4?'bad':'warn']);
+  }
+  const types = byType();
+  if(types.length > 1){
+    const best = types[0], worst = types[types.length-1];
+    const wb = [sideWord(worst.arm,'arm side','glove side'), sideWord(worst.up,'up','down')].filter(Boolean);
+    out.push([`<b>${TNAME[worst.type]}</b> has the loosest command at ${Math.round(worst.score)} (${fmt(worst.d)}" avg miss${wb.length?', leaking '+wb.join(' and '):''}).`, 'bad']);
+    out.push([`<b>${TNAME[best.type]}</b> is the sharpest pitch at ${Math.round(best.score)}, hitting ${Math.round(best.hit*100)}% of targets.`, 'good']);
+  }
+  if(s.n >= 12){
+    const k = Math.floor(s.n/3), early = s.ms.slice(0,k), late = s.ms.slice(-k);
+    const e = early.reduce((a,m)=>a+m.score,0)/k, l = late.reduce((a,m)=>a+m.score,0)/k;
+    if(l - e <= -8) out.push([`Command fades late: first ${k} pitches averaged ${Math.round(e)}, last ${k} averaged ${Math.round(l)}. Possible fatigue or a mechanical drift.`, 'bad']);
+    else if(l - e >= 8) out.push([`Command sharpened as the pen went on, from ${Math.round(e)} early to ${Math.round(l)} late. Look at the warm-up routine.`, 'warn']);
+    else out.push([`Command held steady from start to finish (${Math.round(e)} early, ${Math.round(l)} late).`, 'good']);
+  }
+  const cells = heatCells(s.ms).filter(c=>c.n>=3).sort((a,b)=>a.hit-b.hit);
+  if(cells.length >= 2 && cells[0].hit < s.hit - .1) out.push([`Weakest target area: <b>${cells[0].label}</b>, hitting ${Math.round(cells[0].hit*100)}% there vs ${Math.round(s.hit*100)}% overall.`, 'warn']);
+  const comp = s.ms.filter(m=>!m.hit && m.inZone).length, wild = s.ms.filter(m=>!m.inZone).length;
+  if(misses.length) out.push([`${comp} of ${misses.length} misses still landed in the zone. ${wild} pitch${wild===1?'':'es'} finished outside it.`, wild/s.n > .3 ? 'bad' : '']);
+  const off = s.ms.filter(m=>m.setupOff!=null);
+  if(off.length) out.push([`Manual target used on ${off.length} pitch${off.length===1?'':'es'}. The catcher's setup was ${fmt(off.reduce((a,m)=>a+m.setupOff,0)/off.length)}" off on average.`, '']);
+  return out;
+}
+function byType(){
+  const g = {}; S.pitches.forEach(p => (g[p.type] = g[p.type] || []).push(p));
+  return Object.entries(g).filter(([,l])=>l.length>=2).map(([type,l]) => ({type, ...summary(l)})).sort((a,b)=>b.score-a.score);
+}
+function heatCells(ms){
+  const rows = ['Up','Middle','Down'], cols = ['glove side','middle','arm side'];
+  const cells = []; for(let r=0;r<3;r++) for(let c=0;c<3;c++) cells.push({r,c,n:0,h:0,sc:0,label: r===1&&c===1 ? 'middle-middle' : `${rows[r].toLowerCase()} ${cols[c]}`.replace('middle middle','middle')});
+  ms.forEach(m => { if(m.outT) return; const cell = cells[m.row*3+m.armCol]; cell.n++; cell.h += m.hit?1:0; cell.sc += m.score; });
+  cells.forEach(c => { c.hit = c.n ? c.h/c.n : 0; c.score = c.n ? c.sc/c.n : 0; });
+  return cells;
+}
+
+/* ---------- trends ---------- */
+function filtered(){ return filter==='ALL' ? S.pitches : S.pitches.filter(p=>p.type===filter); }
+function renderFilter(){
+  const types = [...new Set(S.pitches.map(p=>p.type))];
+  if(filter!=='ALL' && !types.includes(filter)) filter='ALL';
+  $('#filter').innerHTML = `<option value="ALL">All pitches</option>` + types.map(t=>`<option value="${t}" ${t===filter?'selected':''}>${TNAME[t]}</option>`).join('');
+}
+$('#filter').onchange = e => { filter = e.target.value; renderTrends(); };
+function renderScatter(list){
+  const W=320, H=320, cx=160, cy=150, h=S.settings.hitR, R = Math.max(18, ...list.map(p=>metrics(p).d)) * 1.08, k = 130/R;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px" role="img" aria-label="Miss locations relative to target">`;
+  svg += `<line class="axis" x1="${cx-140}" y1="${cy}" x2="${cx+140}" y2="${cy}"/><line class="axis" x1="${cx}" y1="${cy-140}" x2="${cx}" y2="${cy+140}"/>`;
+  [[h,'hit'],[2*h,''],[3*h,'0 pts']].forEach(([r,l]) => { if(r*k<=140){ svg += `<circle cx="${cx}" cy="${cy}" r="${r*k}" fill="none" class="grid"/><text x="${cx+r*k*0.71+3}" y="${cy-r*k*0.71-3}">${r}"${l?' '+l:''}</text>`; }});
+  svg += `<circle cx="${cx}" cy="${cy}" r="${h*k}" fill="var(--good)" fill-opacity=".08" stroke="var(--good)" stroke-opacity=".6"/>`;
+  svg += `<text x="${cx+136}" y="${cy-5}" text-anchor="end">ARM SIDE →</text><text x="${cx-136}" y="${cy-5}">← GLOVE</text><text x="${cx+5}" y="${cy-132}">UP</text><text x="${cx+5}" y="${cy+140}">DOWN</text>`;
+  list.forEach(p => { const m = metrics(p); const x=cx+m.arm*k, y=cy-m.up*k;
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${p.id===selectedId?7:5}" fill="${p.manual?'none':TCOL[p.type]}" stroke="${TCOL[p.type]}" stroke-width="${p.manual?2:1}" fill-opacity=".85"><title>#${p.n} ${p.type} · ${fmt(m.d)}" ${m.dir}</title></circle>`; });
+  const s = summary(list);
+  if(s.n){ const x=cx+s.arm*k, y=cy-s.up*k; svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--ink)" stroke-width="2.5" marker-end="url(#ah)"/><defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>`; }
+  svg += `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--ink)"/></svg>`;
+  $('#scatter').innerHTML = svg;
+  const types = [...new Set(list.map(p=>p.type))];
+  $('#legend').innerHTML = types.map(t=>`<span><i style="background:${TCOL[t]}"></i>${TNAME[t]}</span>`).join('') + '<span><i style="border:2px solid var(--muted)"></i>Manual target</span><span>➝ average miss</span>';
+}
+function renderHeat(list){
+  const ms = list.map(metrics), cells = heatCells(ms), out = ms.filter(m=>m.outT).length;
+  let h = '<div class="heat"><span></span><span class="cl">Glove side</span><span class="cl">Middle</span><span class="cl">Arm side</span>';
+  ['Up','Mid','Down'].forEach((r,ri) => { h += `<span class="rl">${r}</span>`;
+    for(let c=0;c<3;c++){ const cell = cells[ri*3+c];
+      if(!cell.n){ h += `<div class="c" style="background:var(--sunk);border:1px dashed var(--line)"><span class="hint">no targets</span></div>`; continue; }
+      const t = tone(cell.score), mix = 12 + Math.round(cell.hit*30);
+      h += `<div class="c" style="background:color-mix(in srgb,var(--${t}) ${mix}%,var(--surface));" title="Average score ${Math.round(cell.score)}"><b>${Math.round(cell.hit*100)}%</b><span>${cell.h}/${cell.n} hit</span></div>`; } });
+  h += '</div>';
+  if(out) h += `<span class="hint">${out} target${out>1?'s':''} set outside the zone (chase spots) not shown.</span>`;
+  $('#heat').innerHTML = h;
+}
+function renderTrendLine(list){
+  const W=340, H=190, L=30, B=24, T=10, Rr=10, n=list.length;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Score by pitch">`;
+  const x = i => L + (n<=1 ? 0 : i*(W-L-Rr)/(n-1)), y = v => T + (100-v)*(H-T-B)/100;
+  [0,25,50,75,100].forEach(v => svg += `<line class="grid" x1="${L}" x2="${W-Rr}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3}" text-anchor="end">${v}</text>`);
+  if(n){
+    const ms = list.map(metrics), roll = ms.map((m,i)=>{ const w = ms.slice(Math.max(0,i-4),i+1); return w.reduce((a,b)=>a+b.score,0)/w.length; });
+    const pts = roll.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+    svg += `<path d="M${x(0)},${y(0)} L${pts.join(' L')} L${x(n-1)},${y(0)} Z" fill="var(--accent)" fill-opacity=".1"/>`;
+    ms.forEach((m,i)=> svg += `<circle cx="${x(i).toFixed(1)}" cy="${y(m.score).toFixed(1)}" r="2.6" fill="${TCOL[list[i].type]}" fill-opacity=".7"><title>#${list[i].n} ${list[i].type}: ${m.score}</title></circle>`);
+    svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--accent)" stroke-width="2.2"/>`;
+    svg += `<circle cx="${x(n-1)}" cy="${y(roll[n-1])}" r="4.5" fill="var(--accent)"/>`;
+    const ticks = n<=10 ? list.map((_,i)=>i) : [0, Math.floor((n-1)/2), n-1];
+    ticks.forEach(i => svg += `<text x="${x(i)}" y="${H-8}" text-anchor="middle">#${list[i].n}</text>`);
+  }
+  $('#trend').innerHTML = svg + '</svg>';
+}
+function renderTypeTable(){
+  const g = {}; S.pitches.forEach(p => (g[p.type]=g[p.type]||[]).push(p));
+  const rows = Object.entries(g).map(([t,l])=>({t,...summary(l)})).sort((a,b)=>b.n-a.n);
+  if(!rows.length){ $('#typeTbl').innerHTML=''; return; }
+  $('#typeTbl').innerHTML = `<table><thead><tr><th>Pitch</th><th class="num">Count</th><th class="num">Score</th><th class="num">Grade</th><th class="num">Hit %</th><th class="num">Avg miss</th><th>Average miss direction</th><th class="num">In zone</th></tr></thead><tbody>` +
+    rows.map(r => { const b = [sideWord(r.arm,'arm','glove'), sideWord(r.up,'up','down')].filter(Boolean).join(', ') || 'centered';
+      return `<tr><td><span class="dot" style="background:${TCOL[r.t]}"></span>${TNAME[r.t]}</td><td class="num mono">${r.n}</td><td class="num mono"><span class="pill ${tone(r.score)}">${Math.round(r.score)}</span></td><td class="num mono">${grade(r.score)}</td><td class="num mono">${Math.round(r.hit*100)}%</td><td class="num mono">${fmt(r.d)}"</td><td>${b}</td><td class="num mono">${Math.round(r.zone*100)}%</td></tr>`; }).join('') + '</tbody></table>';
+}
+function renderTrends(){ const l = filtered(); renderScatter(l); renderHeat(l); renderTrendLine(l); renderTypeTable(); }
+
+/* ---------- log ---------- */
+function renderLog(){
+  if(!S.pitches.length){ $('#log').innerHTML = '<div class="empty">No pitches tagged yet. Mark the glove, then the catch, and each pitch lands here.</div>'; return; }
+  $('#log').innerHTML = `<table><thead><tr><th>#</th><th>Pitch</th><th>Target</th><th class="num">Miss</th><th class="num">Arm/Glove</th><th class="num">Up/Down</th><th>Direction</th><th>Zone</th><th class="num">Score</th></tr></thead><tbody>` +
+    S.pitches.slice().reverse().map(p => { const m = metrics(p);
+      return `<tr class="click ${p.id===selectedId?'sel':''}" data-id="${p.id}"><td class="mono">${p.n}</td><td><span class="dot" style="background:${TCOL[p.type]}"></span>${p.type}</td>
+      <td>${p.manual?'<span class="pill warn">Manual</span>':'<span class="pill neutral">Glove</span>'}${p.auto?' <span class="pill neutral" title="Found by auto-tag">Auto</span>':''}${p.flag?` <span class="pill bad" title="${p.flag}">Check</span>`:''}</td>
+      <td class="num mono">${fmt(m.d)}"</td><td class="num mono">${m.arm>=0?'A':'G'} ${fmt(Math.abs(m.arm))}"</td><td class="num mono">${m.up>=0?'U':'D'} ${fmt(Math.abs(m.up))}"</td>
+      <td>${m.dir}</td><td>${m.inZone?'In':'<span style="color:var(--bad)">Out</span>'}</td><td class="num"><span class="pill ${tone(m.score)}">${m.score}</span></td></tr>`; }).join('') + '</tbody></table>';
+}
+$('#log').onclick = e => {
+  const tr = e.target.closest('tr[data-id]'); if(!tr) return;
+  selectedId = selectedId===tr.dataset.id ? null : tr.dataset.id; editField=null; confirmDel=false;
+  const p = S.pitches.find(x=>x.id===selectedId);
+  if(p){ source = p.manual ? 'manual' : 'glove'; if(hasVideo && p.clip===S.clip) vid.currentTime = p.loc.t; }
+  renderAll(); $('#tagger').scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+function csv(){
+  const head = 'pitch,type,target_source,miss_in,arm_side_in,up_in,direction,in_zone,hit,score,setup_offset_in,clip,catch_time_s';
+  return [head, ...S.pitches.map(p => { const m = metrics(p); return [p.n,p.type,p.manual?'manual':'glove',fmt(m.d,2),fmt(m.arm,2),fmt(m.up,2),m.dir,m.inZone,m.hit,m.score,m.setupOff==null?'':fmt(m.setupOff,2),'"'+(p.clip||'').replace(/"/g,'""')+'"',p.loc.t].join(','); })].join('\n');
+}
+$('#copyCsv').onclick = () => {
+  const text = csv(), box = $('#csvBox');
+  const fallback = () => { box.hidden=false; box.value=text; box.focus(); box.select(); toast('Select-all is done. Press Copy to copy the CSV.'); };
+  try{ navigator.clipboard.writeText(text).then(()=>{ toast(`Copied ${S.pitches.length} pitches as CSV`); box.hidden=true; }, fallback); }catch(e){ fallback(); }
+};
+$('#newSession').onclick = () => {
+  if(!confirmNew){ confirmNew=true; $('#newSession').textContent='Tap again to clear all pitches'; setTimeout(()=>{ confirmNew=false; $('#newSession').textContent='New session'; },3000); return; }
+  confirmNew=false; $('#newSession').textContent='New session';
+  const keepZone = S.example ? null : S.zone;
+  S = blankSession(S.settings); S.zone = keepZone; S.clip = hasVideo ? S.clip : ''; selectedId=null; draft=newDraft();
+  mode = hasVideo && !S.zone ? 'zone' : (source==='manual'?'manual':'target'); save(); renderAll(); toast('Started a new session');
+};
+
+/* ---------- settings ---------- */
+$('#hand').onclick = e => { const b = e.target.closest('button'); if(!b) return; S.settings.hand = b.dataset.v; save(); renderAll(); };
+$('#view').onchange = e => { S.settings.view = e.target.value; save(); renderAll(); };
+$('#hitR').onchange = e => { S.settings.hitR = clamp(+e.target.value||6, 2, 12); e.target.value = S.settings.hitR; save(); renderAll(); };
+$('#fps').onchange = e => { S.settings.fps = +e.target.value; save(); syncTime(); };
+$('#showAll').onchange = draw;
+let confirmClear = false;
+$('#clearMarks').onclick = () => {
+  const b = $('#clearMarks');
+  if(!confirmClear){ confirmClear = true; b.textContent = 'Tap again to clear zone + pitches'; setTimeout(() => { confirmClear = false; b.textContent = 'Clear marks'; }, 3000); return; }
+  confirmClear = false; b.textContent = 'Clear marks';
+  S.pitches = []; S.zone = null; S.seq = 0; S.example = false; if(S.queue) S.qi = 0;
+  draft = newDraft(); selectedId = null; editField = null; mode = hasVideo ? 'zone' : 'target';
+  save(); gotoQueue(); renderAll(); toast('Cleared the zone and all tagged pitches');
+};
+$('#zoomBox').onclick = () => { if(!hasVideo){ toast('Load a video to zoom.'); return; } zoomBoxOn = !zoomBoxOn; renderAll(); };
+$('#zoomPlate').onclick = () => hasVideo ? zoomToPlate() : toast('Load a video to zoom.');
+$('#zoomFull').onclick = () => { view = null; draw(); };
+function renderSettings(){
+  document.querySelectorAll('#hand button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v===S.settings.hand));
+  $('#view').value = S.settings.view; $('#hitR').value = S.settings.hitR; $('#fps').value = S.settings.fps;
+}
+
+document.addEventListener('keydown', e => {
+  if(e.target.closest('input,select,textarea') || e.metaKey || e.ctrlKey) return;
+  const k = e.key;
+  if(k===' '){ e.preventDefault(); $('#play').click(); }
+  else if(k==='ArrowLeft'){ e.preventDefault(); step(e.shiftKey?-10:-1); }
+  else if(k==='ArrowRight'){ e.preventDefault(); step(e.shiftKey?10:1); }
+  else if(k==='g'||k==='G') setSource('glove');
+  else if(k==='m'||k==='M') setSource('manual');
+  else if(k==='z'||k==='Z') $('#redrawZone').click();
+  else if(k==='Backspace'){ e.preventDefault(); undoMark(); }
+  else if(k==='b'||k==='B') $('#zoomBox').click();
+  else if(k==='p'||k==='P') $('#zoomPlate').click();
+  else if(k==='f'||k==='F') $('#zoomFull').click();
+  else if(k==='Escape'){ selectedId=null; editField=null; zoomBoxOn=false; renderAll(); }
+});
+
+/* ---------- auto-tags published next to the page ---------- */
+let autoData = null, confirmAuto = false;
+function renderAutoBanner(){
+  const show = !!autoData && S.autoId !== autoData.id;
+  $('#autoBanner').hidden = !show; if(!show) return;
+  $('#autoTxt').innerHTML = `<b>${autoData.queue.length} pitches found in ${autoData.clip}.</b> Load the pitch list, then choose the video. The tracker jumps to each pitch, so you only click the glove and then the ball.`;
+  $('#exampleBanner').hidden = true;
+}
+$('#autoLoad').onclick = () => {
+  if(!S.example && S.pitches.length && !confirmAuto){ confirmAuto = true; $('#autoLoad').textContent = `Replace your ${S.pitches.length} tagged pitches?`; return; }
+  const d = JSON.parse(JSON.stringify(autoData));
+  S = {...blankSession({...S.settings, ...d.settings}), clip:d.clip, frame:d.frame, queue:d.queue, qi:0, autoId:d.id};
+  if(hasVideo && vid.videoWidth) rescaleTo(vid.videoWidth, vid.videoHeight);
+  selectedId = null; draft = newDraft(); source = 'glove'; mode = hasVideo && !S.zone ? 'zone' : 'target'; confirmAuto = false; $('#autoLoad').textContent = 'Load auto-tags';
+  save(); gotoQueue(); renderAll(); toast(`Loaded ${S.queue.length} detected pitches`);
+};
+fetch('autotags.json').then(r => r.ok ? r.json() : null).then(d => { if(d && Array.isArray(d.queue)){ autoData = d; renderAll(); } }).catch(() => {});
+
+/* ---------- guided queue: jump to each detected pitch ---------- */
+const queueOn = () => !!(S.queue && S.qi < S.queue.length && !selectedId);
+function gotoQueue(){
+  if(!S.queue || !hasVideo) return;
+  const q = S.queue[S.qi];
+  if(!q){ toast('All detected pitches are tagged'); renderAll(); return; }
+  vid.pause();
+  vid.currentTime = mode==='zone' ? q.catch_t : (draft.glove || draft.manual) ? q.catch_t : q.setup_t;
+}
+function renderQueue(){
+  const box = $('#queueBox'); box.hidden = !S.queue; if(!S.queue) return;
+  const q = S.queue[S.qi], fmtT = t => `${Math.floor(t/60)}:${(t%60).toFixed(1).padStart(4,'0')}`;
+  box.innerHTML = q ? `
+    <div class="panel-h"><b>Detected pitch ${S.qi+1} of ${S.queue.length}</b><span class="hint mono">setup ${fmtT(q.setup_t)} · catch ${fmtT(q.catch_t)}</span></div>
+    ${q.est ? '<span class="hint">The ball wasn\'t tracked on this one, so the timing is a guess. Step through the frames to find the setup and the catch.</span>' : '<span class="hint">The dashed ring on the catch frame is the last place the ball was seen. The catch is usually at or just past it.</span>'}
+    <div class="row">
+      <button class="btn sm" data-q="setup">Go to setup</button><button class="btn sm" data-q="catch">Go to catch</button>
+      <button class="btn sm" data-q="back" ${S.qi?'':'disabled'}>Previous pitch</button><button class="btn sm" data-q="skip">Skip, not a pitch</button>
+    </div>` : `<b>All ${S.queue.length} detected pitches done.</b><span class="hint">Tag any extras by hand as usual.</span>`;
+  box.onclick = e => {
+    const a = e.target.closest('[data-q]')?.dataset.q; if(!a || !q) return;
+    if(a==='setup' && hasVideo) vid.currentTime = q.setup_t;
+    if(a==='catch' && hasVideo) vid.currentTime = q.catch_t;
+    if(a==='skip' || a==='back'){ S.qi = Math.max(0, S.qi + (a==='skip'?1:-1)); draft = newDraft(); mode = source==='manual'?'manual':'target'; save(); gotoQueue(); renderAll(); }
+  };
+}
+
+let toastT; function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, 2400); }
+function renderAll(){ renderSettings(); renderTagger(); renderQueue(); renderBoard(); renderAutoBanner(); renderFilter(); renderTrends(); renderLog(); draw(); }
+renderAll();
+</script>
