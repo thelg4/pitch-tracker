@@ -4,15 +4,28 @@
 <meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src media:">
 <title>Bullpen Command</title>
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/controls.css">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="css/shell.css">
 </head>
 <body>
-<nav class="appbar">
-  <a href="#/" class="brand">Bullpen Command</a>
-  <span class="crumbs" id="crumbs"></span>
-</nav>
-<main class="wrap" id="view"></main>
-<div class="toast" id="toast" hidden></div>
+<div id="app" data-page="empty">
+  <header id="titlebar">
+    <button type="button" class="ib" id="tglSidebar" title="Toggle sidebar (⌥⌘S)" aria-label="Toggle sidebar">◧</button>
+    <div id="tbTitle"></div>
+    <div id="tbCenter"></div>
+    <div id="tbRight"></div>
+    <button type="button" class="ib" id="tglInspector" title="Toggle inspector (⌥⌘I)" aria-label="Toggle inspector">◨</button>
+  </header>
+  <div id="main">
+    <aside id="sidebar"><div class="inner"></div></aside>
+    <main id="center"></main>
+    <aside id="inspector" aria-label="Inspector"><div class="inner"></div></aside>
+  </div>
+</div>
+<div id="sheetHost"></div>
+<div class="toast" id="toast" role="status" hidden></div>
 <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -29,12 +29,15 @@ try {
   page.on('pageerror', e => errors.push(String(e)));
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  await page.waitForSelector('.card');
+  await page.waitForSelector('.sb-athlete[data-id]');
   await page.screenshot({ path: `${OUT}/1-roster.png` });
-  await page.click('.card');
+  await page.click('.sb-athlete[data-id]');
+  await page.waitForSelector('.sb-session[data-id]');
   await page.waitForSelector('#sessions tr[data-id]');
-  await page.click('#sessions tr[data-id]');
+  await page.screenshot({ path: `${OUT}/shell.png` });
+  await page.click('.sb-session[data-id]');
   await page.waitForFunction(() => document.querySelector('#drop')?.hidden && document.querySelector('#scrub').max > 1, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running')); // let the page crossfade settle
 
   // Mirror the app's geometry so we can click at frame coordinates.
   const FW = 1080, FH = 1920;
@@ -61,7 +64,7 @@ try {
   const plan = [['FB', 2, 1], ['FB', 7, 3], ['SL', -4, -6], ['CH', 3, -2], ['FB', 0, 0.5], ['CB', -1, -9]];
   for (const [type, dxIn, upIn] of plan) {
     await page.click(`#types [data-t="${type}"]`);
-    await page.evaluate(() => window.scrollTo(0, 0)); Object.assign(cropR, await rect('#cvCrop'));
+    await page.evaluate(() => document.querySelector('#center').scrollTo(0, 0)); Object.assign(cropR, await rect('#cvCrop'));
     await page.keyboard.press('Shift+ArrowRight');
     const [tx, ty] = onCrop(540, 1250); await page.mouse.click(tx, ty);
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
@@ -78,7 +81,7 @@ try {
   assert.equal(await page.$eval('#sN', e => e.textContent.trim()), '6');
   await page.screenshot({ path: `${OUT}/3-session.png`, fullPage: true });
 
-  await page.click('.crumbs a');
+  await page.click('.sb-athlete[data-id]');
   await page.waitForSelector('#sessions tr[data-id]');
   await page.screenshot({ path: `${OUT}/4-athlete.png`, fullPage: true });
   assert.deepEqual(errors, []);

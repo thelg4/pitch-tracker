@@ -3,7 +3,7 @@
 // <video>, so they always show the same frame. All marks are stored in frame pixels.
 import { TYPES, TCOL, TNAME, clamp, fmt, scored, summary, grade, tone, GRADE_TXT, insights } from './scoring.js';
 import { scatter, legend, heat, rollingTrend, typeTable } from './charts.js';
-import { $, $$, db, esc, fmtDate, handLabel, toast, confirmTap, crumbs, mediaUrl, basename } from './util.js';
+import { $, $$, db, esc, fmtDate, handLabel, toast, confirmTap, mediaUrl, basename } from './util.js';
 
 export async function sessionView(root, id){
   const data = await db('getSession', id);
@@ -17,7 +17,6 @@ export async function sessionView(root, id){
   let dragZone = null, dragCrop = null, pan = null, raf = 0, cropSaveT = 0;
   function newDraft(){ return {glove:null, manual:null, loc:null}; }
 
-  crumbs(`<span>›</span><a href="#/athlete/${A.id}">${esc(A.name)}</a><span>›</span><span>${fmtDate(S.recordedOn)}</span>`);
   root.innerHTML = `
     <header class="top">
       <div><h1>${fmtDate(S.recordedOn)} bullpen</h1><div class="sub">${esc(A.name)} · ${handLabel(A.throws)} · <span id="clipName"></span></div></div>
@@ -456,8 +455,7 @@ export async function sessionView(root, id){
 
   /* ---------- settings ---------- */
   function renderSettings(){ $('#date').value = S.recordedOn; $('#view').value = S.cameraView; $('#hitR').value = S.hitRadius; $('#fps').value = S.fps; }
-  $('#date').onchange = async e => { if(!e.target.value) return; await patchSession({recordedOn: e.target.value}); $('h1').textContent = `${fmtDate(S.recordedOn)} bullpen`;
-    crumbs(`<span>›</span><a href="#/athlete/${A.id}">${esc(A.name)}</a><span>›</span><span>${fmtDate(S.recordedOn)}</span>`); };
+  $('#date').onchange = async e => { if(!e.target.value) return; await patchSession({recordedOn: e.target.value}); $('h1').textContent = `${fmtDate(S.recordedOn)} bullpen`; };
   $('#view').onchange = async e => { await patchSession({cameraView: e.target.value}); refresh(); };
   $('#hitR').onchange = async e => { await patchSession({hitRadius: clamp(+e.target.value || 6, 2, 12)}); refresh(); };
   $('#fps').onchange = async e => { await patchSession({fps: +e.target.value}); syncTime(); };

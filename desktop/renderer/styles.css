@@ -1,78 +1,23 @@
-/* Visual language carried over from app/bullpen-command.html, using local fonts so the app works offline. */
-:root{
-  --paper:#ECEFF3; --surface:#FFFFFF; --sunk:#F5F7FA; --ink:#14233B; --muted:#5A6980; --line:#D2D9E3;
-  --accent:#2450A6; --accent-ink:#FFFFFF; --stage:#0E1726; --stage-ink:#C9D3E2;
-  --good:#2C8A57; --warn:#B87810; --bad:#C3343F;
-  --f-display:"Avenir Next Condensed","Arial Narrow",Impact,sans-serif;
-  --f-body:system-ui,-apple-system,"Segoe UI",sans-serif;
-  --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --paper:#0C1420; --surface:#142033; --sunk:#101A2A; --ink:#E4E9F1; --muted:#93A1B6; --line:#243349;
-  --accent:#7EA4F0; --accent-ink:#0C1420; --stage:#070D17; --stage-ink:#AEBBD0;
-  --good:#4CC086; --warn:#E3A73C; --bad:#F06571; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --paper:#0C1420; --surface:#142033; --sunk:#101A2A; --ink:#E4E9F1; --muted:#93A1B6; --line:#243349;
-  --accent:#7EA4F0; --accent-ink:#0C1420; --stage:#070D17; --stage-ink:#AEBBD0;
-  --good:#4CC086; --warn:#E3A73C; --bad:#F06571; color-scheme:dark}
-*{box-sizing:border-box}
-[hidden]{display:none !important} /* components below set display, which would otherwise beat the hidden attribute */
-html,body{margin:0}
-body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+/* Styles for the pre-redesign athlete and session views, which now mount inside #center.
+   Colors come from css/tokens.css. Tasks 6-7 replace these with css/athlete.css and css/session.css. */
 .wrap{max-width:1480px;margin:0 auto;display:grid;gap:18px;padding:18px 20px 48px}
 h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;margin:0;text-wrap:balance}
 h1{font-size:30px;line-height:1}
 h2{font-size:19px;text-transform:uppercase;letter-spacing:.05em}
-a{color:var(--accent)}
-.lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 .mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-button,select,input,textarea{font:inherit;color:inherit}
-button{cursor:pointer}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .hint{color:var(--muted);font-size:12.5px}
 .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-
-/* App bar */
-.appbar{position:sticky;top:0;z-index:10;display:flex;gap:14px;align-items:center;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--line);-webkit-app-region:drag}
-body[data-platform=darwin] .appbar{padding-left:90px} /* clear the macOS window buttons */
-.appbar a,.appbar button{-webkit-app-region:no-drag}
-.brand{font-family:var(--f-display);font-weight:700;font-size:18px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink);text-decoration:none}
-.crumbs{color:var(--muted);display:flex;gap:8px;align-items:center}
-.crumbs a{color:var(--muted);text-decoration:none}.crumbs a:hover{color:var(--ink)}
 
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px}
 header.top .sub{color:var(--muted);margin-top:4px;max-width:62ch}
 .setup{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
-.field{display:grid;gap:4px}
-.field select,.field input,.field textarea{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
 .field input[type=number]{width:72px}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--surface)}
-.seg button{border:0;background:none;padding:6px 11px;font-weight:500}
-.seg button+button{border-left:1px solid var(--line)}
-.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
 
-.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:7px 12px;font-weight:500;display:inline-flex;gap:6px;align-items:center;text-decoration:none;color:var(--ink)}
-.btn:hover{border-color:var(--muted)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
-.btn.danger{color:var(--bad)}
-.btn.sm{padding:4px 9px;font-size:13px}
-.btn:disabled{opacity:.45;cursor:not-allowed}
-
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
+.panel{background:var(--surface);border:.5px solid var(--faint);border-radius:var(--r-card);padding:16px;display:grid;gap:12px;min-width:0}
 .panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
 .bench{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:1100px){.bench{grid-template-columns:minmax(0,1fr)}}
 .empty{color:var(--muted);padding:24px;text-align:center;border:1px dashed var(--line);border-radius:8px}
-
-/* Athlete roster */
-.roster{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:10px;text-decoration:none;color:var(--ink)}
-.card:hover{border-color:var(--accent)}
-.card .name{font-family:var(--f-display);font-size:22px;font-weight:700;line-height:1.05}
-.card .meta{display:flex;justify-content:space-between;align-items:flex-end;gap:8px}
-.card .score{font-family:var(--f-display);font-size:40px;font-weight:700;line-height:.9}
-.addform{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
-.addform input[type=text]{width:220px}
 
 /* Session stages: full frame left, zoomed crop right, both drawn from one hidden <video>. */
 .stages{position:relative;display:flex;gap:12px;height:clamp(380px,62vh,820px)}
@@ -150,5 +95,3 @@ tbody tr.sel{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 tbody tr.click{cursor:pointer} tbody tr.click:hover{background:var(--sunk)}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:0}
 textarea.csv{width:100%;min-height:140px;font-family:var(--f-mono);font-size:12px;background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px;color:var(--ink)}
-.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:8px 14px;border-radius:8px;font-weight:500;z-index:20}
-@media (prefers-reduced-motion:no-preference){.toast{animation:pop .18s ease-out}@keyframes pop{from{transform:translate(-50%,6px);opacity:.4}}}

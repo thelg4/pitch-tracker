@@ -32,7 +32,7 @@ function serveVideo(req){
 function createWindow(){
   const win = new BrowserWindow({
     width: 1440, height: 960, minWidth: 1000, minHeight: 700,
-    title: 'Bullpen Command', backgroundColor: '#0C1420', titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    title: 'Bullpen Command', backgroundColor: '#1c1c1e', titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true },
   });
   win.webContents.setWindowOpenHandler(({ url }) => { if(/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });

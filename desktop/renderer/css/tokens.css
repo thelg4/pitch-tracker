@@ -1,0 +1,23 @@
+/* macOS dark system palette. The app is dark-only. */
+:root{
+  color-scheme:dark;
+  --bg:#1c1c1e; --bar:#2c2c2e; --side:#232325; --hi:#3a3a3c; --sep:#000;
+  --txt:#f2f2f7; --dim:#98989d; --faint:rgba(255,255,255,.06);
+  --blue:#0a84ff; --green:#30d158; --orange:#ff9f0a; --red:#ff453a; --purple:#bf5af2; --teal:#64d2ff; --yellow:#ffd60a;
+  --hair:.5px solid var(--sep);
+  --r-ctl:6px; --r-seg:7px; --r-card:10px;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+  --f-ui:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",sans-serif;
+  --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sb-w:200px; --in-w:240px; --tb-h:44px;
+
+  /* Names the pre-redesign views still use (styles.css); they map onto the palette above. */
+  --paper:var(--bg); --surface:var(--side); --sunk:var(--bar); --ink:var(--txt); --muted:var(--dim);
+  --line:rgba(255,255,255,.09); --accent:var(--blue); --accent-ink:#fff; --stage:#000; --stage-ink:rgba(255,255,255,.65);
+  --good:var(--green); --warn:var(--orange); --bad:var(--red);
+  --f-display:var(--f-ui); --f-body:var(--f-ui);
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
