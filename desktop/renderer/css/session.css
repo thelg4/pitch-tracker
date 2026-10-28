@@ -1,0 +1,144 @@
+/* Session page: the viewer on black with its transport and timeline, the title-bar tool control, the HUD,
+   and the inspector's Pitch and Session tabs. */
+/* A column that fills #center exactly: the viewer takes what the transport and timeline/list leave, so the page never scrolls. */
+.session.wrap{display:flex;flex-direction:column;height:100%;max-width:none;padding:0}
+
+/* Tool control (title bar): a segmented control with a highlight pill that slides with a spring. */
+.tools{position:relative;display:flex;padding:2px;border-radius:var(--r-seg);background:var(--bg);font-size:12px}
+.tools>button{position:relative;z-index:1;padding:3px 11px;border-radius:5px;color:var(--dim);font-weight:500;transition:color 100ms,background-color 100ms}
+.tools>button .k{font:600 9.5px var(--f-mono);opacity:.6;margin-left:5px}
+.tools>button[aria-pressed=true]{color:#fff}
+.tools>button:not([aria-pressed=true]):not(:disabled):hover{background:rgba(255,255,255,.06)}
+.tools>button:disabled{opacity:.35}
+.tool-pill{position:absolute;z-index:0;top:2px;bottom:2px;left:0;width:0;border-radius:5px;background:var(--blue);transition:left 320ms var(--spring),width 320ms var(--spring)}
+.tool-pill.still{transition:none}
+.tool-pill.off{opacity:0}
+
+/* Viewer: full frame and catcher crop side by side on black, both drawn from one hidden <video>. */
+.sv{flex:1;min-height:0;display:flex;flex-direction:column;background:#000;padding:6px 6px 0}
+.stages{position:relative;flex:1;min-height:0;display:flex;gap:3px;max-height:1000px}
+.pane{position:relative;background:#111;border-radius:4px;overflow:hidden;min-width:0;touch-action:none}
+.pane.full{flex:0 0 auto;height:100%;max-width:min(45%,calc(100% - 330px))} /* the catcher view keeps at least ~325px at the minimum window size */
+.pane.crop{flex:1 1 auto}
+.pane canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pane.full canvas{cursor:move}
+.pane.crop canvas{cursor:crosshair}
+.pane .tag{position:absolute;left:8px;bottom:6px;font-size:9.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.6);pointer-events:none}
+.stages.drag{outline:2px dashed var(--blue);outline-offset:-2px;border-radius:4px}
+.vid{position:absolute;width:2px;height:2px;opacity:0;pointer-events:none}
+.drop{position:absolute;inset:0;z-index:3;display:grid;place-content:center;justify-items:center;gap:10px;color:var(--dim);text-align:center;padding:20px;background:#000;border-radius:4px}
+.drop strong{font-size:20px;font-weight:700;color:var(--txt);letter-spacing:-.01em}
+
+/* HUD: the current step as a frosted pill centered at the top of the catcher view. */
+.hud{position:absolute;left:50%;top:10px;z-index:2;transform:translateX(-50%);max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:rgba(28,28,30,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:.5px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;color:var(--txt);font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none}
+.hud:empty{display:none}
+
+/* Catch pop: a disc over the new ball marker, scaling 0 -> 1.25 -> 1 and then fading to the canvas mark. */
+.pop{position:absolute;z-index:1;border-radius:50%;border:1.5px solid #fff;pointer-events:none}
+.pop.go{animation:ballPop 500ms cubic-bezier(.25,1,.5,1) forwards}
+@keyframes ballPop{0%{transform:scale(0);opacity:0}55%{transform:scale(1.25);opacity:1}75%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}
+
+/* Transport */
+.transport{flex:none;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:6px 10px 8px;color:#fff}
+.tp-btns{display:flex;align-items:center;gap:4px}
+.tp{height:24px;min-width:30px;padding:0 7px;border-radius:var(--r-ctl);color:rgba(255,255,255,.75);font-size:12px;font-variant-numeric:tabular-nums}
+.tp:hover{background:rgba(255,255,255,.08)}
+.tp:active{background:rgba(255,255,255,.14)}
+.tp.play{color:#fff;font-size:15px;min-width:34px}
+.tp-btns select{margin-left:6px}
+.transport input[type=range]{width:100%;min-width:0}
+.transport .time{font:500 11.5px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--dim);min-width:130px;text-align:right;white-space:nowrap}
+
+/* Timeline: a 34px lane under the transport. Clips span glove release to catch; the playhead is red. */
+.tl{flex:none;padding:2px 10px 10px;color:#fff}
+.tlh{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:10.5px;margin-bottom:6px}
+.lane{position:relative;height:34px;background:#141416;border-radius:5px;overflow:hidden;cursor:ew-resize;touch-action:none;user-select:none}
+.ruler{position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(90deg,transparent 0 23px,rgba(255,255,255,.06) 23px 24px)}
+.clip{position:absolute;top:5px;bottom:5px;box-sizing:border-box;border-radius:4px;padding:2px 5px;font-size:9px;font-weight:600;display:flex;flex-direction:column;justify-content:center;line-height:1.1;overflow:hidden;white-space:nowrap;cursor:pointer;color:#fff;box-shadow:inset 0 0 0 .5px rgba(255,255,255,.25)}
+.clip small{font-weight:500;opacity:.8}
+.clip.marker{z-index:2;width:24px;transform:translateX(-50%)}
+.clip.marker.in{animation-name:clipInM}
+.clip:hover,.clip.sel{z-index:3}
+.clip.sel{box-shadow:0 0 0 1.5px #fff}
+.clip.in{animation:clipIn 550ms var(--spring)}
+@keyframes clipIn{0%{transform:translateY(16px) scale(.6);opacity:0}100%{transform:none;opacity:1}}
+.ph{position:absolute;z-index:4;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--red);pointer-events:none}
+.ph::before{content:"";position:absolute;top:-1px;left:-4px;border:5px solid transparent;border-top:6px solid var(--red)}
+/* The list takes a bounded band under the transport and scrolls inside it; the viewer above shrinks to make room. */
+.tl .tbl{height:clamp(120px,24vh,260px);overflow:auto}
+.tl .empty{padding:12px 0;color:var(--dim);font-size:12px}
+@keyframes clipInM{0%{transform:translate(-50%,16px) scale(.6);opacity:0}100%{transform:translateX(-50%);opacity:1}}
+
+/* Inspector: Pitch | Session tabs over a pane that scrolls on its own. */
+.insp{display:flex;flex-direction:column;height:100%}
+.itabs{flex:none;display:flex;gap:2px;padding:8px;border-bottom:.5px solid rgba(255,255,255,.06)}
+.itabs button{flex:1;padding:3px;border-radius:5px;color:var(--dim);font-size:12px;font-weight:500}
+.itabs button:hover{background:rgba(255,255,255,.05)}
+.itabs button[aria-selected=true]{background:var(--hi);color:var(--txt)}
+.ipane{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden}
+.isec{padding:10px 12px;border-bottom:.5px solid rgba(255,255,255,.06);display:flex;flex-direction:column;gap:6px;min-width:0}
+.isec:last-child{border-bottom:0}
+.isec .lab{font-size:10px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+.isec .hint{font-size:11.5px}
+.isec p{margin:0}
+.lab-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.iscore{display:flex;align-items:flex-end;gap:10px}
+.bigscore{font-size:44px;font-weight:700;letter-spacing:-.03em;line-height:.9;font-variant-numeric:tabular-nums;color:var(--dim)}
+.igrade{display:grid;color:var(--dim);font-size:12px;line-height:1.3;padding-bottom:2px}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:12px}
+.kv>span:first-child{color:var(--dim)}
+.kv>span:last-child{font:500 11.5px var(--f-mono);font-variant-numeric:tabular-nums}
+.insight{color:var(--dim);font-size:12px}
+.insight b{color:var(--txt);font-weight:600}
+
+/* Pitch-type grid (4 x 2) */
+.ptypes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.ptypes button{display:flex;align-items:center;justify-content:center;gap:4px;padding:4px 0;border-radius:5px;background:var(--bar);font-size:11px;font-weight:600}
+.ptypes button:hover{background:var(--hi)}
+.ptypes button i{width:6px;height:6px;border-radius:50%}
+.ptypes button[aria-pressed=true]{background:var(--blue);color:#fff}
+
+/* Zone-third picker for the manual target */
+.zonepick{display:grid;grid-template-columns:auto repeat(3,minmax(0,1fr));grid-template-rows:auto repeat(3,26px);gap:3px;align-items:center}
+.zonepick button{border:.5px solid rgba(255,255,255,.14);background:var(--bar);border-radius:5px;height:100%}
+.zonepick button:hover{background:color-mix(in srgb,var(--blue) 25%,var(--bar))}
+.zonepick .cl{font-size:9.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;text-align:center;padding-right:2px}
+
+/* Edit actions for a selected pitch */
+.iacts{display:grid;grid-template-columns:1fr;gap:4px}
+.iacts.two{grid-template-columns:1fr 1fr}
+.iacts .btn{justify-content:center}
+
+/* Session tab: settings, stats, findings and compact charts sized to the inspector */
+.iform{display:grid;gap:5px}
+.iform label{display:grid;grid-template-columns:minmax(0,1fr) 116px;align-items:center;gap:8px;font-size:12px;color:var(--dim)}
+.iform input,.iform select{width:100%;font-size:12px;padding:3px 6px}
+.iform select{padding-right:20px}
+.insp .insights{gap:6px;font-size:12px}
+.insp .insights li{grid-template-columns:6px 1fr;gap:8px}
+.insp .insights li::before{width:6px;height:6px;margin-top:5px}
+.insp .insights b{color:var(--txt)}
+.ichart{display:grid;gap:4px;min-width:0;padding-top:4px}
+.ichart .lbl{font-size:9.5px}
+.iscatter svg{display:block;margin:0 auto}
+.iscatter svg text{font-size:14px}
+.insp .legend{font-size:10.5px;gap:2px 9px}
+.insp .heat{gap:3px}
+.insp .heat .c{min-height:40px;padding:4px 2px;border-radius:5px}
+.insp .heat .c b{font-size:12.5px}
+.insp .heat .c span{font-size:9.5px}
+.insp .heat .rl,.insp .heat .cl{font-size:8.5px}
+.insp .heat+.hint{font-size:10.5px}
+.itbl table{font-size:10.5px}
+.itbl th{font-size:8.5px;letter-spacing:.03em;padding:4px 3px;white-space:normal;vertical-align:bottom;border-bottom:.5px solid rgba(255,255,255,.1)}
+.itbl td{padding:4px 3px;border-bottom:.5px solid rgba(255,255,255,.07)}
+.itbl th:first-child,.itbl td:first-child{padding-left:0}
+.itbl th:last-child,.itbl td:last-child{padding-right:0}
+.itbl .dot{width:7px;height:7px;margin-right:4px}
+.itbl tbody tr:last-child td{border-bottom:0}
+.itbl .pill{padding:1px 6px;font-size:10.5px}
+/* Grade, direction and in-zone columns don't fit the narrow inspector; the athlete page shows them. */
+.itbl th:nth-child(4),.itbl td:nth-child(4),.itbl th:nth-child(7),.itbl td:nth-child(7),.itbl th:nth-child(8),.itbl td:nth-child(8){display:none}
+
+/* CSV fallback sheet */
+textarea.csv{width:100%;min-height:160px;font-family:var(--f-mono);font-size:11.5px;resize:vertical}

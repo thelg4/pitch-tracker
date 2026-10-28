@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('bullpen', {
   db: (method, ...args) => ipcRenderer.invoke('db', method, ...args),
   chooseVideo: () => ipcRenderer.invoke('choose-video'),
   allowVideo: file => ipcRenderer.invoke('allow-video', file),
+  videoExists: file => ipcRenderer.invoke('video-exists', file),
   pathForFile: file => webUtils.getPathForFile(file),
+  onMenu: cb => { const h = (_e, action) => cb(action); ipcRenderer.on('menu', h); return () => ipcRenderer.removeListener('menu', h); },
   revealDb: () => ipcRenderer.invoke('reveal-db'),
+  // Tell the menu a checkbox's state (the renderer owns it; see Show All Pitches).
+  menuState: (id, checked) => ipcRenderer.send('menu-state', id, checked),
 });

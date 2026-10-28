@@ -26,6 +26,21 @@ test('athletes, sessions and pitches round-trip', () => {
   assert.ok(db.hasVideo('/tmp/pen.mov')); assert.ok(!db.hasVideo('/etc/passwd'));
 });
 
+test('listLibrary returns every athlete with sessions newest first', () => {
+  const db = openDb(':memory:');
+  db.createAthlete({name: 'Zed'});
+  const amy = db.createAthlete({name: 'amy'});
+  const older = db.createSession({athleteId: amy.id, recordedOn: '2026-10-01'});
+  const newer = db.createSession({athleteId: amy.id, recordedOn: '2026-10-20'});
+  db.addPitch(older.id, pitch(200));
+  db.addPitch(newer.id, pitch(200)); db.addPitch(newer.id, pitch(210));
+  const lib = db.listLibrary();
+  assert.deepEqual(lib.map(a => a.name), ['amy', 'Zed']);
+  assert.deepEqual(lib[0].sessions.map(s => s.recordedOn), ['2026-10-20', '2026-10-01']);
+  assert.equal(lib[0].sessions[0].pitches.length, 2);
+  assert.deepEqual(lib[1].sessions, []);
+});
+
 test('deleting a pitch renumbers the rest', () => {
   const db = openDb(':memory:');
   const s = db.createSession({athleteId: db.createAthlete({name: 'A'}).id});
