@@ -9,9 +9,9 @@ export function menuTemplate(send){
       item('New Session', 'new-session', 'CmdOrCtrl+Shift+N'),
       { type: 'separator' },
       item('Relink Video…', 'relink-video'),
-      item('Show Database in Finder', 'show-db'),
+      item('Show Database File', 'show-db'),
       { type: 'separator' },
-      item('Export CSV…', 'export-csv', 'CmdOrCtrl+E'),
+      item('Export CSV', 'export-csv', 'CmdOrCtrl+E'),
       { type: 'separator' },
       { role: 'close' },
     ] },
@@ -25,7 +25,7 @@ export function menuTemplate(send){
     { label: 'View', submenu: [
       item('Toggle Sidebar', 'toggle-sidebar', 'Alt+CmdOrCtrl+S'),
       item('Toggle Inspector', 'toggle-inspector', 'Alt+CmdOrCtrl+I'),
-      item('Toggle Pitch List', 'toggle-list', 'CmdOrCtrl+L'),
+      item('Timeline/List', 'toggle-list', 'CmdOrCtrl+L'),
       { type: 'separator' },
       item('Inspector: Pitch', 'inspector-pitch', 'CmdOrCtrl+1'),
       item('Inspector: Session', 'inspector-session', 'CmdOrCtrl+2'),
@@ -37,8 +37,8 @@ export function menuTemplate(send){
       item('Frame Catcher  C', 'frame-catcher'),
       item('Redraw Zone  Z', 'redraw-zone'),
       { type: 'separator' },
-      item('Delete Session', 'delete-session'),
+      item('Delete Session…', 'delete-session'),
     ] },
-    { label: 'Help', submenu: [item('How Scoring Works', 'help-score')] },
+    { label: 'Help', submenu: [item('How the Score Works', 'help-score')] },
   ];
 }

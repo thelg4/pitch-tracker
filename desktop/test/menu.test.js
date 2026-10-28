@@ -36,3 +36,8 @@ test('key accelerators', () => {
 test('no bare single-key accelerators', () => {
   for(const i of collect(menuTemplate(() => {}))) if(i.accelerator) assert.match(i.accelerator, /(Cmd|Ctrl|Alt|Shift)/);
 });
+
+test('spec labels are pinned', () => {
+  const labels = collect(menuTemplate(() => {})).map(i => i.label);
+  for(const l of ['Show Database File', 'Export CSV', 'Timeline/List', 'Delete Session…', 'How the Score Works']) assert.ok(labels.includes(l), l);
+});
