@@ -57,8 +57,10 @@ try {
   // Draw the zone over the plate: 170 px wide = 17 in -> 10 px/in.
   const [zx1, zy1] = onCrop(455, 1110), [zx2, zy2] = onCrop(625, 1400);
   await page.mouse.move(zx1, zy1); await page.mouse.down(); await page.mouse.move((zx1 + zx2) / 2, (zy1 + zy2) / 2); await page.mouse.move(zx2, zy2); await page.mouse.up();
-  await page.waitForFunction(() => document.querySelector('#stZone span')?.textContent.includes('px/in'));
-  assert.match(await page.$eval('#stZone span', e => e.textContent), /10\.0 px\/in/);
+  // Drawing the zone moves the tool control to Target. Task 9 adds the exact #zonePpi check back.
+  await page.waitForFunction(() => document.querySelector('#tools [data-tool="target"]')?.getAttribute('aria-pressed') === 'true');
+  assert.equal(await page.$eval('#tools [data-tool="zone"]', e => e.getAttribute('aria-pressed')), 'false');
+  assert.match(await page.$eval('#toast', e => e.textContent), /Zone set · 10\.0 px per inch/);
   crop = { cx: 540, cy: 1255, w: Math.min(FW, Math.max(170 * 5, 290 * 2.4 * asp)) }; // frameCatcher() after the zone is drawn
 
   // Tag pitches: glove target, step frames, catch. Offsets are inches (arm side +x for a RHP from behind, up = -y).
@@ -78,8 +80,10 @@ try {
   assert.equal(rows.length, expected.length, `log rows: ${rows.join(' ; ')}`);
   // The log lists the newest pitch first; the two offsets sit in adjacent cells.
   rows.reverse().forEach((r, i) => assert.ok(r.includes(expected[i].replace('/', ' | ')), `pitch ${i + 1} row "${r}" should read ${expected[i]}`));
+  await page.waitForTimeout(700); // let the score count-up finish
   assert.equal(await page.$eval('#bigScore', e => e.textContent.trim()), '80');
   assert.equal(await page.$eval('#sN', e => e.textContent.trim()), '6');
+  await page.screenshot({ path: `${OUT}/session.png` });
   await page.screenshot({ path: `${OUT}/3-session.png`, fullPage: true });
 
   // Keys pressed inside an open sheet must not reach the session's shortcuts.

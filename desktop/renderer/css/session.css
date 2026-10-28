@@ -1,0 +1,88 @@
+/* Session page: the viewer on black with its transport, the title-bar tool control, the HUD, and the
+   tagging, score, trend and log panels below the viewer (Tasks 8-9 move those into the timeline and inspector). */
+.session.wrap{display:block;max-width:none;padding:0}
+
+/* Tool control (title bar): a segmented control with a highlight pill that slides with a spring. */
+.tools{position:relative;display:flex;padding:2px;border-radius:var(--r-seg);background:var(--bg);font-size:12px}
+.tools>button{position:relative;z-index:1;padding:3px 11px;border-radius:5px;color:var(--dim);font-weight:500;transition:color 100ms,background-color 100ms}
+.tools>button .k{font:600 9.5px var(--f-mono);opacity:.6;margin-left:5px}
+.tools>button[aria-pressed=true]{color:#fff}
+.tools>button:not([aria-pressed=true]):not(:disabled):hover{background:rgba(255,255,255,.06)}
+.tools>button:disabled{opacity:.35}
+.tool-pill{position:absolute;z-index:0;top:2px;bottom:2px;left:0;width:0;border-radius:5px;background:var(--blue);transition:left 320ms var(--spring),width 320ms var(--spring)}
+.tool-pill.still{transition:none}
+.tool-pill.off{opacity:0}
+
+/* Viewer: full frame and catcher crop side by side on black, both drawn from one hidden <video>. */
+.sv{background:#000;padding:6px 6px 0}
+.stages{position:relative;display:flex;gap:3px;height:clamp(360px,calc(100vh - var(--tb-h) - 150px),1000px)}
+.pane{position:relative;background:#111;border-radius:4px;overflow:hidden;min-width:0;touch-action:none}
+.pane.full{flex:0 0 auto;height:100%;max-width:45%}
+.pane.crop{flex:1 1 auto}
+.pane canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.pane.full canvas{cursor:move}
+.pane.crop canvas{cursor:crosshair}
+.pane .tag{position:absolute;left:8px;bottom:6px;font-size:9.5px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.6);pointer-events:none}
+.stages.drag{outline:2px dashed var(--blue);outline-offset:-2px;border-radius:4px}
+.vid{position:absolute;width:2px;height:2px;opacity:0;pointer-events:none}
+.drop{position:absolute;inset:0;z-index:3;display:grid;place-content:center;justify-items:center;gap:10px;color:var(--dim);text-align:center;padding:20px;background:#000;border-radius:4px}
+.drop strong{font-size:20px;font-weight:700;color:var(--txt);letter-spacing:-.01em}
+
+/* HUD: the current step as a frosted pill centered at the top of the catcher view. */
+.hud{position:absolute;left:50%;top:10px;z-index:2;transform:translateX(-50%);max-width:calc(100% - 20px);overflow:hidden;text-overflow:ellipsis;background:rgba(28,28,30,.72);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:.5px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;color:var(--txt);font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none}
+.hud:empty{display:none}
+
+/* Catch pop: a disc over the new ball marker, scaling 0 -> 1.25 -> 1 and then fading to the canvas mark. */
+.pop{position:absolute;z-index:1;border-radius:50%;border:1.5px solid #fff;pointer-events:none}
+.pop.go{animation:ballPop 500ms cubic-bezier(.25,1,.5,1) forwards}
+@keyframes ballPop{0%{transform:scale(0);opacity:0}55%{transform:scale(1.25);opacity:1}75%{transform:scale(1);opacity:1}100%{transform:scale(1);opacity:0}}
+
+/* Transport */
+.transport{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:6px 10px 8px;color:#fff}
+.tp-btns{display:flex;align-items:center;gap:4px}
+.tp{height:24px;min-width:30px;padding:0 7px;border-radius:var(--r-ctl);color:rgba(255,255,255,.75);font-size:12px;font-variant-numeric:tabular-nums}
+.tp:hover{background:rgba(255,255,255,.08)}
+.tp:active{background:rgba(255,255,255,.14)}
+.tp.play{color:#fff;font-size:15px;min-width:34px}
+.tp-btns select{margin-left:6px}
+.transport input[type=range]{width:100%;min-width:0}
+.transport .time{font:500 11.5px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--dim);min-width:130px;text-align:right;white-space:nowrap}
+
+/* Panels below the viewer */
+.below{display:grid;gap:14px;max-width:1480px;margin:0 auto;padding:14px 20px 48px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.kbd{font-family:var(--f-mono);font-size:11px;border:.5px solid rgba(255,255,255,.18);border-bottom-width:1.5px;border-radius:4px;padding:0 4px;background:var(--bar)}
+.hintbar{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.hintbar>.hint{flex:1;min-width:0;gap:4px 14px}
+.hintbar>.row:last-child{flex-wrap:nowrap}
+.panel{background:var(--side);border:.5px solid var(--faint);border-radius:var(--r-card);padding:16px;display:grid;gap:12px;min-width:0}
+.panel-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.panel h2{font-size:13px;text-transform:none;letter-spacing:normal}
+.bench{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:1100px){.bench{grid-template-columns:minmax(0,1fr)}}
+.setup{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end;padding-top:4px;border-top:.5px solid rgba(255,255,255,.07)}
+.setup .field{padding-top:8px}
+.setup input[type=number]{width:72px}
+
+/* Tagger */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:.5px solid rgba(255,255,255,.14);background:var(--bar);border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:500;display:inline-flex;gap:6px;align-items:center}
+.chip:hover{background:var(--hi)}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip[aria-pressed=true]{background:var(--hi);border-color:var(--txt);box-shadow:inset 0 0 0 .5px var(--txt)}
+.zonepick{display:grid;grid-template-columns:auto repeat(3,44px);grid-template-rows:auto repeat(3,34px);gap:4px;align-items:center;justify-content:start}
+.zonepick button{border:.5px solid rgba(255,255,255,.14);background:var(--bar);border-radius:5px;height:100%}
+.zonepick button:hover{background:color-mix(in srgb,var(--blue) 25%,var(--bar))}
+.zonepick .cl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;text-align:center}
+.edit{border:.5px solid var(--blue);border-radius:var(--r-card);padding:12px;display:grid;gap:10px;background:color-mix(in srgb,var(--blue) 8%,var(--side))}
+
+/* Scoreboard */
+.big{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap}
+.big .score{font-family:var(--f-ui);font-size:64px;line-height:.9;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.big .grade{display:grid;gap:4px;padding-bottom:4px;justify-items:start}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:rgba(255,255,255,.07);border:.5px solid rgba(255,255,255,.07);border-radius:8px;overflow:hidden}
+.stats>div{background:var(--side);padding:9px 10px;display:grid;gap:2px}
+.stats .v{font-family:var(--f-mono);font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.method{font-size:12.5px;color:var(--dim)}
+.method summary{cursor:default;font-weight:600}
+textarea.csv{width:100%;min-height:140px;font-family:var(--f-mono);font-size:12px}

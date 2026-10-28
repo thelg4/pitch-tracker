@@ -87,6 +87,8 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
     toFrameCrop: e => toFrame(e, cvCrop, cropFit()),
     toFrameFull: e => toFrame(e, cvFull, fullFit()),
     cropRect, cropScale: () => cropFit().s,
+    // A frame point in CSS pixels on the catcher canvas, with the scale, for overlays placed on it.
+    toCropPx(pt){ const f = cropFit(); return {x: f.ox + pt.x*f.s, y: f.oy + pt.y*f.s, s: f.s}; },
     // Stop a pending crop save and return the crop, for a final save on unmount.
     flush(){ clearTimeout(cropSaveT); return crop; },
     get crop(){ return crop; },
