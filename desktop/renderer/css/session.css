@@ -17,7 +17,7 @@
 .sv{background:#000;padding:6px 6px 0}
 .stages{position:relative;display:flex;gap:3px;height:clamp(360px,calc(100vh - var(--tb-h) - 150px),1000px)}
 .pane{position:relative;background:#111;border-radius:4px;overflow:hidden;min-width:0;touch-action:none}
-.pane.full{flex:0 0 auto;height:100%;max-width:45%}
+.pane.full{flex:0 0 auto;height:100%;max-width:min(45%,calc(100% - 330px))} /* the catcher view keeps at least ~325px at the minimum window size */
 .pane.crop{flex:1 1 auto}
 .pane canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .pane.full canvas{cursor:move}

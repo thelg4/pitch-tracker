@@ -73,6 +73,7 @@ export async function sessionView(root, id, ctx){
   function setTab(t){
     tab = t;
     iq('#inspPitch').hidden = t !== 'pitch'; iq('#inspSession').hidden = t !== 'session';
+    if(t === 'session') renderSessionPane(); // it is only kept current while shown
     insp.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === t));
   }
   iq('#itabs').onclick = e => { const b = e.target.closest('[data-tab]'); if(b) setTab(b.dataset.tab); };
@@ -99,9 +100,18 @@ export async function sessionView(root, id, ctx){
 
   /* ---------- video ---------- */
   function showDrop(title, txt){ q('#drop').hidden = false; q('#dropTitle').textContent = title; q('#dropTxt').textContent = txt; }
-  function loadVideo(){
+  function showMissing(){
+    if(dead) return;
+    hasVideo = false;
+    showDrop("Can't open this video", `${basename(S.videoPath)} was moved, deleted, or isn't a format this app can play. Choose it again.`);
+    renderAll();
+  }
+  async function loadVideo(){
     hasVideo = false;
     if(!S.videoPath){ showDrop('Choose the bullpen video', 'Film from behind the pitcher with the catcher in view. Drop the file here or choose it.'); return; }
+    // Check first: a file that is gone is the common case, and requesting it would only log a 404.
+    const exists = await window.bullpen.videoExists(S.videoPath); if(dead) return;
+    if(!exists){ showMissing(); return; }
     q('#drop').hidden = true; vid.src = mediaUrl(S.videoPath); vid.playbackRate = +q('#rate').value;
   }
   async function useVideo(file){
@@ -120,11 +130,8 @@ export async function sessionView(root, id, ctx){
     viewer.ensureCrop();
     viewer.resize(); refresh();
   });
-  vid.addEventListener('error', () => {
-    hasVideo = false;
-    showDrop("Can't open this video", `${basename(S.videoPath)} was moved, deleted, or isn't a format this app can play. Choose it again.`);
-    renderAll();
-  });
+  vid.addEventListener('error', showMissing);
+  vid.addEventListener('loadeddata', () => drawStages()); // the first frame is decoded after loadedmetadata
   vid.addEventListener('seeked', () => { syncTime(); drawStages(); });
   vid.addEventListener('play', () => { setPlayIcon(true); cancelAnimationFrame(raf); raf = requestAnimationFrame(tick); });
   vid.addEventListener('pause', () => { setPlayIcon(false); syncTime(); drawStages(); });
@@ -207,10 +214,14 @@ export async function sessionView(root, id, ctx){
     else if(mode === 'location'){ draft.loc = pt; await commit(); return; }
     renderAll();
   }
+  // The draft is taken and the next pitch started before the save is awaited, so a click that arrives while
+  // it is saving starts the next pitch instead of re-committing this one.
   async function commit(){
-    const p = await db('addPitch', S.id, {type: curType, glove: draft.glove, manual: draft.manual, loc: draft.loc, zone: {...S.zone}});
+    const d = {type: curType, glove: draft.glove, manual: draft.manual, loc: draft.loc, zone: {...S.zone}};
+    draft = newDraft(); mode = source === 'manual' ? 'manual' : 'target';
+    const p = await db('addPitch', S.id, d);
     if(dead) return;
-    pitches.push(p); draft = newDraft(); mode = source === 'manual' ? 'manual' : 'target';
+    pitches.push(p);
     pitchesChanged(); popAt(p);
     const m = list.find(x => x.id === p.id).m;
     toast(`#${p.n} ${p.type}: ${m.hit?'hit':'miss'} · ${fmt(m.d)}" · ${m.score} pts`);
@@ -305,7 +316,7 @@ export async function sessionView(root, id, ctx){
   function renderInspector(sel){
     renderPitchTab(iq('#inspPitch'), {list, selected: sel, draft, curType, source, hasVideo,
       onType: setType, onPreset: manualPreset, onAction: pitchAction});
-    renderSessionPane();
+    if(tab === 'session') renderSessionPane(); // a hidden Session tab skips the chart redraws; setTab renders it on show
   }
   function renderSessionPane(){
     if(filter !== 'ALL' && !list.some(p => p.type === filter)) filter = 'ALL';

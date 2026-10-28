@@ -66,6 +66,8 @@ app.whenReady().then(() => {
     if(!VIDEO_EXT.includes(path.extname(file).slice(1).toLowerCase())) return false;
     picked.add(file); return true;
   });
+  // Lets the session say a video is missing without requesting it (a 404 from media:// logs a console error).
+  ipcMain.handle('video-exists', (_e, file) => (picked.has(file) || db.hasVideo(file)) && fs.existsSync(file));
   ipcMain.handle('reveal-db', () => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(a => BrowserWindow.getFocusedWindow()?.webContents.send('menu', a))));
