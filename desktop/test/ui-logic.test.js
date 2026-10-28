@@ -91,9 +91,14 @@ test('a pitch with no glove is a marker centred on the catch', () => {
   near(c.left, 0.5 - MIN_CLIP / 2); near(c.width, MIN_CLIP); assert.equal(c.marker, true);
 });
 
-test('a glove released after the catch is a marker', () => {
+test('a glove released after the catch is a fixed-width marker centred on the catch', () => {
   const c = clipFor({glove: pt(2), manual: null, loc: pt(1.5)}, 10);
-  assert.equal(c.marker, true);
+  near(c.left, 0.15 - MIN_CLIP / 2); near(c.width, MIN_CLIP); assert.equal(c.marker, true);
+});
+
+test('a glove released at the same time as the catch is a marker centred on the catch', () => {
+  const c = clipFor({glove: pt(1.5), manual: null, loc: pt(1.5)}, 10);
+  near(c.left, 0.15 - MIN_CLIP / 2); near(c.width, MIN_CLIP); assert.equal(c.marker, true);
 });
 
 test('a clip shorter than the minimum is widened to MIN_CLIP', () => {

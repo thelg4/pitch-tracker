@@ -28,12 +28,13 @@ export function toolState({mode, hasZone, hasVideo, selected, editField}){
   return {active: tool, catchEnabled, hud: HUD[tool]};
 }
 
-// Timeline clip for a pitch as fractions of the video. A pitch with no glove release is a marker on the catch.
+// Timeline clip for a pitch as fractions of the video. A pitch with no glove release, or one whose
+// release is not before the catch, is a fixed-width marker centred on the catch.
 export function clipFor(pitch, duration){
   const loc = pitch.loc.t / duration;
-  if(!pitch.glove) return place(loc - MIN_CLIP / 2, MIN_CLIP, true);
-  const g = pitch.glove.t / duration;
-  return place(Math.min(g, loc), Math.max(MIN_CLIP, Math.abs(loc - g)), g > loc);
+  const g = pitch.glove ? pitch.glove.t / duration : null;
+  if(g === null || g >= loc) return place(loc - MIN_CLIP / 2, MIN_CLIP, true);
+  return place(g, Math.max(MIN_CLIP, loc - g), false);
 }
 
 const place = (left, width, marker) => ({left: Math.min(Math.max(left, 0), 1 - width), width, marker});
