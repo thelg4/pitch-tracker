@@ -14,7 +14,8 @@
     "postinstall": "electron-builder install-app-deps",
     "dist:mac": "electron-builder --mac --arm64 --x64",
     "dist:win": "electron-builder --win --x64",
-    "test:e2e": "node test/e2e/tagging.e2e.mjs"
+    "test:e2e": "node test/e2e/tagging.e2e.mjs",
+    "test:packaged": "node test/e2e/packaged.e2e.mjs"
   },
   "build": {
     "appId": "com.thelg4.bullpencommand",
