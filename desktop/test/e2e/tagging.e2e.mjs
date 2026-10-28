@@ -81,6 +81,23 @@ try {
   assert.equal(await page.$eval('#sN', e => e.textContent.trim()), '6');
   await page.screenshot({ path: `${OUT}/3-session.png`, fullPage: true });
 
+  // Keys pressed inside an open sheet must not reach the session's shortcuts.
+  const timeBefore = await page.$eval('#time', e => e.textContent);
+  const openNewAthlete = async () => {
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('menu', 'new-athlete'));
+    await page.waitForSelector('#sheetHost form [data-cancel]');
+  };
+  await openNewAthlete();
+  await page.focus('#sheetHost [data-cancel]');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Space'); // a focused Cancel button presses natively, closing the sheet
+  assert.equal(await page.$eval('#time', e => e.textContent), timeBefore);
+  assert.equal(await page.$eval('#vid', v => v.paused), true);
+  await openNewAthlete();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#sheetHost form'));
+  assert.equal(await page.$eval('#time', e => e.textContent), timeBefore);
+
   await page.click('.sb-athlete[data-id]');
   await page.waitForSelector('#sessions tr[data-id]');
   await page.screenshot({ path: `${OUT}/4-athlete.png`, fullPage: true });

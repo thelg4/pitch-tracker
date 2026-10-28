@@ -31,8 +31,10 @@ export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Canc
     // Capture phase on window, so keys never reach the views' own shortcut handlers while a sheet is open.
     const onKey = e => {
       if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); close(null); }
-      else if(!form.contains(e.target)) e.stopPropagation();
-      else if(e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON'){ e.preventDefault(); form.requestSubmit(); }
+      else{
+        e.stopPropagation(); // even from inside the sheet: Space or a letter on a focused button must not reach a view
+        if(e.key === 'Enter' && form.contains(e.target) && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON'){ e.preventDefault(); form.requestSubmit(); }
+      }
     };
     window.addEventListener('keydown', onKey, true);
     form.addEventListener('submit', e => { e.preventDefault(); close(new FormData(form)); });

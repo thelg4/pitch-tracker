@@ -24,6 +24,11 @@ export function renderSidebar(el, library, {athleteId, sessionId}, {onAthlete, o
         <span class="sb-name">${esc(a.name)}</span></button>${sessions}`;
   }).join('');
 
+  // Re-rendering replaces the rows, so carry the list's scroll position and the focused row across.
+  const oldList = el.querySelector('.sb-list'), scrollTop = oldList?.scrollTop ?? 0;
+  const focused = el.contains(document.activeElement) && document.activeElement.matches('.sb-athlete, .sb-session')
+    ? `.${document.activeElement.classList.contains('sb-athlete') ? 'sb-athlete' : 'sb-session'}[data-id="${document.activeElement.dataset.id}"]` : null;
+
   el.innerHTML = `<nav class="sb" aria-label="Athletes">
     <div class="sb-head">Athletes</div>
     <div class="sb-list">${rows}</div>
@@ -34,4 +39,12 @@ export function renderSidebar(el, library, {athleteId, sessionId}, {onAthlete, o
     (row.classList.contains('sb-athlete') ? onAthlete : onSession)(+row.dataset.id);
   };
   el.querySelector('#sbNew').onclick = onNewAthlete;
+
+  const list = el.querySelector('.sb-list');
+  list.scrollTop = scrollTop;
+  if(focused) el.querySelector(focused)?.focus({preventScroll: true});
+  // Bring the current row into view only if it is outside the list's visible area.
+  const cur = list.querySelector('.act');
+  if(cur && (cur.offsetTop < list.scrollTop || cur.offsetTop + cur.offsetHeight > list.scrollTop + list.clientHeight))
+    cur.scrollIntoView({block: 'nearest'});
 }
