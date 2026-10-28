@@ -1,0 +1,52 @@
+{
+  "name": "bullpen-command",
+  "productName": "Bullpen Command",
+  "version": "0.1.0",
+  "description": "Measure pitch command from bullpen video and track athletes over time.",
+  "author": "thelg4",
+  "license": "UNLICENSED",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/scoring.test.js && ELECTRON_RUN_AS_NODE=1 electron --test test/db.test.js",
+    "postinstall": "electron-builder install-app-deps",
+    "dist:mac": "electron-builder --mac --arm64 --x64",
+    "dist:win": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.thelg4.bullpencommand",
+    "productName": "Bullpen Command",
+    "files": [
+      "main.js",
+      "db.js",
+      "preload.cjs",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.sports",
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "thelg4",
+      "repo": "pitch-tracker"
+    }
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0"
+  }
+}
