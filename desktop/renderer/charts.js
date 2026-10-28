@@ -1,5 +1,6 @@
 // SVG/HTML chart builders. Each takes a scored pitch list ([{...pitch, m}]) and returns markup.
-import { TCOL, TNAME, fmt, summary, heatCells, tone, grade, sideWord } from './scoring.js';
+import { PCOL } from './colors.js';
+import { TNAME, fmt, summary, heatCells, tone, grade, sideWord } from './scoring.js';
 import { esc, fmtDate } from './util.js';
 
 export function scatter(list, hitR, selectedId){
@@ -10,7 +11,7 @@ export function scatter(list, hitR, selectedId){
   svg += `<circle cx="${cx}" cy="${cy}" r="${h*k}" fill="var(--good)" fill-opacity=".08" stroke="var(--good)" stroke-opacity=".6"/>`;
   svg += `<text x="${cx+136}" y="${cy-5}" text-anchor="end">ARM SIDE →</text><text x="${cx-136}" y="${cy-5}">← GLOVE</text><text x="${cx+5}" y="${cy-132}">UP</text><text x="${cx+5}" y="${cy+140}">DOWN</text>`;
   list.forEach(p => { const m = p.m, x=cx+m.arm*k, y=cy-m.up*k;
-    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${p.id===selectedId?7:5}" fill="${p.manual?'none':TCOL[p.type]}" stroke="${TCOL[p.type]}" stroke-width="${p.manual?2:1}" fill-opacity=".85"><title>#${p.n} ${p.type} · ${fmt(m.d)}" ${m.dir}</title></circle>`; });
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${p.id===selectedId?7:5}" fill="${p.manual?'none':PCOL[p.type]}" stroke="${PCOL[p.type]}" stroke-width="${p.manual?2:1}" fill-opacity=".85"><title>#${p.n} ${p.type} · ${fmt(m.d)}" ${m.dir}</title></circle>`; });
   const s = summary(list);
   if(s.n){ const x=cx+s.arm*k, y=cy-s.up*k; svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--ink)" stroke-width="2.5" marker-end="url(#ah)"/><defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--ink)"/></marker></defs>`; }
   return svg + `<circle cx="${cx}" cy="${cy}" r="3" fill="var(--ink)"/></svg>`;
@@ -18,7 +19,7 @@ export function scatter(list, hitR, selectedId){
 
 export function legend(list){
   const types = [...new Set(list.map(p=>p.type))];
-  return types.map(t=>`<span><i style="background:${TCOL[t]}"></i>${TNAME[t]}</span>`).join('') + '<span><i style="border:2px solid var(--muted)"></i>Manual target</span><span>➝ average miss</span>';
+  return types.map(t=>`<span><i style="background:${PCOL[t]}"></i>${TNAME[t]}</span>`).join('') + '<span><i style="border:2px solid var(--muted)"></i>Manual target</span><span>➝ average miss</span>';
 }
 
 export function heat(list){
@@ -56,7 +57,7 @@ function lineChart(points, aria, {w: W = 560, h: H = 220} = {}){
 // Pitch-by-pitch score with a 5-pitch rolling average. `size` is passed to lineChart.
 export function rollingTrend(list, size){
   const roll = list.map((_,i) => { const w = list.slice(Math.max(0,i-4),i+1); return w.reduce((a,p)=>a+p.m.score,0)/w.length; });
-  return lineChart(list.map((p,i) => ({v: roll[i], dotV: p.m.score, color: TCOL[p.type], label: '#'+p.n, title: `#${p.n} ${p.type}: ${p.m.score}`})), 'Score by pitch', size);
+  return lineChart(list.map((p,i) => ({v: roll[i], dotV: p.m.score, color: PCOL[p.type], label: '#'+p.n, title: `#${p.n} ${p.type}: ${p.m.score}`})), 'Score by pitch', size);
 }
 
 // Command score per session, oldest first. sessions: [{recordedOn, list}]
@@ -72,5 +73,5 @@ export function typeTable(list){
   if(!rows.length) return '';
   return `<table><thead><tr><th>Pitch</th><th class="num">Count</th><th class="num">Score</th><th class="num">Grade</th><th class="num">Hit %</th><th class="num">Avg miss</th><th>Average miss direction</th><th class="num">In zone</th></tr></thead><tbody>` +
     rows.map(r => { const b = [sideWord(r.arm,'arm','glove'), sideWord(r.up,'up','down')].filter(Boolean).join(', ') || 'centered';
-      return `<tr><td><span class="dot" style="background:${TCOL[r.t]}"></span>${TNAME[r.t]}</td><td class="num mono">${r.n}</td><td class="num mono"><span class="pill ${tone(r.score)}">${Math.round(r.score)}</span></td><td class="num mono">${grade(r.score)}</td><td class="num mono">${Math.round(r.hit*100)}%</td><td class="num mono">${fmt(r.d)}"</td><td>${b}</td><td class="num mono">${Math.round(r.zone*100)}%</td></tr>`; }).join('') + '</tbody></table>';
+      return `<tr><td><span class="dot" style="background:${PCOL[r.t]}"></span>${TNAME[r.t]}</td><td class="num mono">${r.n}</td><td class="num mono"><span class="pill ${tone(r.score)}">${Math.round(r.score)}</span></td><td class="num mono">${grade(r.score)}</td><td class="num mono">${Math.round(r.hit*100)}%</td><td class="num mono">${fmt(r.d)}"</td><td>${b}</td><td class="num mono">${Math.round(r.zone*100)}%</td></tr>`; }).join('') + '</tbody></table>';
 }

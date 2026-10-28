@@ -2,7 +2,8 @@
 // (a pane inside the shell's #inspector). The first call builds the tab; later calls update it in place,
 // so the score can count from its old value and focused inputs stay put. Handlers are assigned as
 // properties on every call, so re-rendering never stacks listeners and the newest callbacks always win.
-import { TYPES, TCOL, TNAME, fmt, summary, grade, tone, GRADE_TXT, insights } from '../scoring.js';
+import { PCOL } from '../colors.js';
+import { TYPES, TNAME, fmt, summary, grade, tone, GRADE_TXT, insights } from '../scoring.js';
 import { scatter, legend, heat, rollingTrend, typeTable } from '../charts.js';
 import { countTo, settleCount } from '../motion.js';
 
@@ -24,7 +25,7 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
         <div class="iscore"><div class="bigscore" id="bigScore">–</div><div class="igrade"><span id="gradeVal"></span><span id="gradeTxt"></span></div></div></section>
       <section class="isec"><div class="lab" id="typeLab"></div>
         <div class="ptypes" id="types" role="group" aria-label="Pitch type">${TYPES.map(([k, n]) =>
-          `<button type="button" data-t="${k}" title="${n}" aria-pressed="false"><i style="background:${TCOL[k]}"></i>${k}</button>`).join('')}</div>
+          `<button type="button" data-t="${k}" title="${n}" aria-pressed="false"><i style="background:${PCOL[k]}"></i>${k}</button>`).join('')}</div>
         <div class="hint" id="draftHint"></div></section>
       <section class="isec" id="manualSec" hidden><div class="lab">Manual target</div>
         <div class="zonepick" id="zonepick">${pick}</div>

@@ -70,6 +70,7 @@ app.whenReady().then(() => {
   ipcMain.handle('video-exists', (_e, file) => (picked.has(file) || db.hasVideo(file)) && fs.existsSync(file));
   ipcMain.handle('reveal-db', () => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
 
+  ipcMain.on('menu-state', (_e, id, checked) => { const it = Menu.getApplicationMenu()?.getMenuItemById(id); if(it) it.checked = !!checked; });
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(a => BrowserWindow.getFocusedWindow()?.webContents.send('menu', a))));
 
   createWindow();

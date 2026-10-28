@@ -3,12 +3,13 @@ import { athleteView } from './athlete.js';
 import { sessionView } from './session/session.js';
 import { renderSidebar } from './sidebar.js';
 import { setTitle, setToolbar, setInspector, togglePanel, restorePanels, setPage } from './shell.js';
-import { openSheet } from './sheets.js';
+import { openSheet, isOpen as sheetOpen } from './sheets.js';
 import { replayClass } from './motion.js';
-import { $, db, esc, fmtDate, handLabel, basename } from './util.js';
+import { $, db, esc, fmtDate, handLabel, basename, toast, showAllPref } from './util.js';
 
 document.body.dataset.platform = window.bullpen.platform;
 restorePanels();
+window.bullpen.menuState('show-all', showAllPref());
 
 const LAST = 'bullpen.lastAthlete';
 const remember = id => { try{ localStorage.setItem(LAST, id); }catch{} };
@@ -125,7 +126,19 @@ const menu = {
   'toggle-inspector': () => { if(isSession()) togglePanel('inspector'); },
   'show-db': () => window.bullpen.revealDb(),
 };
-window.bullpen.onMenu(action => (menu[action] ?? (() => active.onMenu?.(action)))());
+// What a menu action needs when the page can't do it, so the item never silently does nothing.
+const NEEDS = {'new-session': 'Select an athlete first'};
+// Menu actions wait while a sheet is open (the sheet owns input until it closes).
+window.bullpen.onMenu(action => {
+  if(sheetOpen()){
+    if(action === 'show-all') window.bullpen.menuState('show-all', showAllPref()); // undo the native checkbox flip
+    return;
+  }
+  if(menu[action]){ menu[action](); return; }
+  if(active.onMenu?.(action)) return;
+  if(action === 'show-all') window.bullpen.menuState('show-all', showAllPref());
+  toast(NEEDS[action] || 'Open a session first');
+});
 $('#tglSidebar').onclick = () => togglePanel('sidebar');
 $('#tglInspector').onclick = () => togglePanel('inspector');
 

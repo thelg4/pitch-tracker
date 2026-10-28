@@ -7,6 +7,15 @@ export const fmtDate = (d, year = true) => d ? new Date(d + 'T12:00:00').toLocal
 export const handLabel = t => t === 'L' ? 'LHP' : 'RHP';
 export const basename = p => p.split(/[\\/]/).pop();
 
+// Show All Pitches: kept across sessions and launches; the View menu's checkbox follows it.
+const SHOW_ALL = 'bullpen.showAll';
+export function showAllPref(v){
+  try{
+    if(v !== undefined) localStorage.setItem(SHOW_ALL, v ? '1' : '0');
+    return localStorage.getItem(SHOW_ALL) !== '0';
+  }catch{ return v ?? true; }
+}
+
 let toastT;
 export function toast(msg){
   const t = $('#toast'); t.textContent = msg; t.hidden = false;

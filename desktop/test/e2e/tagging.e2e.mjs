@@ -138,6 +138,12 @@ try {
   assert.equal(await page.$eval('#time', e => e.textContent), timeBefore);
   assert.equal(await page.$eval('#vid', v => v.paused), true);
   await openNewAthlete();
+  // Menu actions wait while a sheet is open: Delete Session doesn't replace it and Timeline/List doesn't switch.
+  const viewBefore = await page.$eval('#log', e => e.hidden);
+  await menu('delete-session'); await menu('toggle-list');
+  await page.waitForTimeout(200);
+  assert.equal(await page.$eval('#sheetTitle', e => e.textContent), 'New Athlete');
+  assert.equal(await page.$eval('#log', e => e.hidden), viewBefore);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#sheetHost form'));
   assert.equal(await page.$eval('#time', e => e.textContent), timeBefore);
@@ -169,6 +175,8 @@ try {
   await menu('toggle-sidebar'); await menu('toggle-inspector');
   await page.waitForFunction(() => ['#sidebar', '#inspector'].every(s => document.querySelector(s).getBoundingClientRect().width === 0));
   await page.waitForTimeout(300); // the canvases resize after the panel springs close
+  const panelVis = () => page.evaluate(() => ['#sidebar', '#inspector'].map(s => getComputedStyle(document.querySelector(s)).visibility));
+  assert.deepEqual(await panelVis(), ['hidden', 'hidden'], 'collapsed panels leave the tab order');
   const cropBefore = cropR.w;
   await syncCropRect();
   assert.ok(cropR.w > cropBefore, `crop pane grows with the panels closed (${cropBefore} -> ${cropR.w})`);
@@ -181,6 +189,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#sidebar').getBoundingClientRect().width === 200 && document.querySelector('#inspector').getBoundingClientRect().width === 240);
   await page.waitForTimeout(300);
   assert.deepEqual(await panelWidths(), [200, 240]);
+  assert.deepEqual(await panelVis(), ['visible', 'visible']);
 
   // 2. Rapid tagging: four pitches with no pause between clicks; none lost, duplicated or merged.
   await syncCropRect();
@@ -232,6 +241,27 @@ try {
   assert.deepEqual([r[0][0], r[0][1], r[0][4], r[0][5]], ['14', 'FB', 'A 2.0"', 'U 1.0"'], `retried row ${r[0].join(' | ')}`);
   assert.deepEqual(errors, [], 'no unhandled rejection from the failed save');
 
+  // Show All Pitches: the menu checkbox follows the renderer, and the choice is kept for the next session.
+  const showAllItem = () => app.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('show-all').checked);
+  assert.equal(await showAllItem(), true);
+  await menu('show-all');
+  await page.waitForFunction(() => localStorage.getItem('bullpen.showAll') === '0');
+  await page.waitForTimeout(100);
+  assert.equal(await showAllItem(), false);
+  await menu('show-all');
+  await page.waitForFunction(() => localStorage.getItem('bullpen.showAll') === '1');
+  await page.waitForTimeout(100);
+  assert.equal(await showAllItem(), true);
+
+  // Selecting a pitch seeks to the middle of its catch frame, not the rounded stored time.
+  const t14 = +asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)}); console.log(d.getSession(1).pitches.find(p=>p.n===14).loc.t); d.close();`).trim();
+  await page.click('#viewToggle [data-v="list"]');
+  await page.click('#log tbody tr[data-id]');
+  await page.waitForFunction(() => document.querySelector('#log tbody tr.sel') && !document.querySelector('#vid').seeking);
+  const seekT = await page.$eval('#vid', v => v.currentTime);
+  assert.ok(Math.abs(seekT * 60 - (Math.floor(t14 * 60 + 1e-6) + 0.5)) < 1e-3, `seek ${seekT} lands mid-frame for ${t14}`);
+  await page.click('#log tbody tr.sel'); // deselect
+
   // 3. Minimum window size: the catcher view stays usable and the page itself never scrolls.
   const setWinSize = (w, h) => app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0].setSize(w, h), [w, h]);
   // The viewport is pinned by setViewportSize (a per-session emulation override), so pin it to the window's new content size.
@@ -276,6 +306,9 @@ try {
   await page.screenshot({ path: `${OUT}/missing-video.png` });
   await page.click('.sb-athlete[data-id="1"]');
   await page.waitForFunction(() => location.hash === '#/athlete/1' && document.querySelectorAll('#sessions tr[data-id]').length === 2);
+  // A session-only menu item on the athlete page says why it did nothing.
+  await menu('export-csv');
+  await page.waitForFunction(() => document.querySelector('#toast').textContent === 'Open a session first' && !document.querySelector('#toast').hidden);
   await page.click(`.sb-session[data-id="${missingId}"]`);
   await page.waitForFunction(id => location.hash === '#/session/' + id, missingId);
   await page.waitForSelector('#drop', { state: 'visible' });

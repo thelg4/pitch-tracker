@@ -1,7 +1,8 @@
 // Session viewer: the geometry and drawing for the two canvases. The full frame shows the whole video with
 // the movable crop box; the catcher crop is the zoomed view where marks are placed. Both draw from one hidden
 // <video>, so they always show the same frame. All marks and the crop are stored in frame pixels.
-import { TCOL, clamp } from '../scoring.js';
+import { clamp } from '../scoring.js';
+import { PCOL } from '../colors.js';
 import { toast } from '../util.js';
 
 // The getters read the controller's current state, so the viewer never holds a stale copy of it.
@@ -42,7 +43,7 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
     if(getHasVideo()) c.drawImage(vid, f.ox, f.oy, W, H);
     const cr = cropRect(), x = f.ox + cr.x*f.s, y = f.oy + cr.y*f.s, w = cr.w*f.s, h = cr.h*f.s;
     c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.rect(f.ox, f.oy, W, H); c.rect(x, y, w, h); c.fill('evenodd');
-    if(getShowAll()) getList().forEach(p => { c.fillStyle = TCOL[p.type]; c.beginPath(); c.arc(f.ox + p.loc.x*f.s, f.oy + p.loc.y*f.s, 2.5, 0, 7); c.fill(); });
+    if(getShowAll()) getList().forEach(p => { c.fillStyle = PCOL[p.type]; c.beginPath(); c.arc(f.ox + p.loc.x*f.s, f.oy + p.loc.y*f.s, 2.5, 0, 7); c.fill(); });
     c.strokeStyle = '#FFD24A'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
   }
   function drawCrop(){
@@ -63,7 +64,7 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
     if(sel) drawPitch(c, sel, lw, 1); else drawPitch(c, getDraft(), lw, 1);
   }
   function drawPitch(c, p, lw, alpha){
-    const col = TCOL[p.type] || '#fff', ppi = (p.zone || getSession().zone || {w:170}).w/17, ballR = 1.45*ppi;
+    const col = PCOL[p.type] || '#fff', ppi = (p.zone || getSession().zone || {w:170}).w/17, ballR = 1.45*ppi;
     c.globalAlpha = alpha;
     const t = p.manual || p.glove;
     if(p.glove){ // catcher's glove: ring

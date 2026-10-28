@@ -137,5 +137,5 @@ export async function athleteView(root, id, ctx){
   };
   bar('#newSession').onclick = () => ctx.newSession(id);
 
-  return {cleanup: () => { dead = true; settleCount(q('#bigScore')); }, onMenu: a => { if(a === 'new-session') ctx.newSession(id); }};
+  return {cleanup: () => { dead = true; settleCount(q('#bigScore')); }, onMenu: a => { if(a !== 'new-session') return false; ctx.newSession(id); return true; }};
 }

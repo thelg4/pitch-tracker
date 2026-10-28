@@ -31,6 +31,7 @@ test('key accelerators', () => {
   assert.equal(byAction('undo-mark').accelerator, undefined);
   assert.equal(byAction('show-all').type, 'checkbox');
   assert.equal(byAction('show-all').checked, true);
+  assert.equal(byAction('show-all').id, 'show-all'); // main finds it by id to follow the renderer's state
 });
 
 test('no bare single-key accelerators', () => {

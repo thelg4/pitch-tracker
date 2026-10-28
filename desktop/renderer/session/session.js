@@ -3,12 +3,13 @@
 // tabs. This controller owns the tagging state, the pointer and key handling, the title-bar tool control and
 // HUD, and the session's menu actions. The shell's slots (#tbCenter, #tbRight, #inspector) are the only
 // nodes queried outside `root`.
-import { TCOL, TNAME, clamp, fmt, scored } from '../scoring.js';
+import { PCOL } from '../colors.js';
+import { TNAME, clamp, fmt, scored } from '../scoring.js';
 import { setTitle, setToolbar, setInspector, togglePanel } from '../shell.js';
 import { openSheet } from '../sheets.js';
 import { replayClass, reducedMotion, settleCount } from '../motion.js';
 import { toolState } from '../ui-logic.js';
-import { $, $$, db, esc, fmtDate, handLabel, toast, mediaUrl, basename } from '../util.js';
+import { $, $$, db, esc, fmtDate, handLabel, toast, mediaUrl, basename, showAllPref } from '../util.js';
 import { createViewer } from './viewer.js';
 import { renderTimeline, renderList } from './timeline.js';
 import { renderPitchTab, renderSessionTab } from './inspector.js';
@@ -23,7 +24,7 @@ export async function sessionView(root, id, ctx){
   const settings = () => ({hand: A.throws, view: S.cameraView, hitR: S.hitRadius});
   let list = [];
   let draft = newDraft(), mode = S.zone ? 'target' : 'zone', source = 'glove', curType = 'FB';
-  let selectedId = null, editField = null, filter = 'ALL', hasVideo = false, showAll = true, tab = 'pitch', dead = false;
+  let selectedId = null, editField = null, filter = 'ALL', hasVideo = false, showAll = showAllPref(), tab = 'pitch', dead = false;
   let dragZone = null, dragCrop = null, pan = null, raf = 0, popT = 0, pillPlaced = false, tl = null, view = 'timeline';
   function newDraft(){ return {glove:null, manual:null, loc:null}; }
   const q = sel => $(sel, root), qq = sel => $$(sel, root);
@@ -139,6 +140,8 @@ export async function sessionView(root, id, ctx){
   function tick(){ syncTime(); drawStages(); if(!vid.paused && !vid.ended) raf = requestAnimationFrame(tick); }
 
   const frameOf = t => Math.floor(t*S.fps + 1e-6);
+  // Stored times are rounded to 1 ms; seek to the middle of their frame so the decoder never shows a neighbor.
+  const seekTo = t => { vid.currentTime = (frameOf(t) + 0.5) / S.fps; };
   function syncTime(){ const t = vid.currentTime; tl?.setPlayhead(t); q('#scrub').value = t; q('#time').textContent = `${Math.floor(t/60)}:${(t%60).toFixed(2).padStart(5,'0')} · f${frameOf(t)}`; }
   // Seek to the middle of the target frame so rounding never lands on its neighbor.
   function step(n){
@@ -241,7 +244,7 @@ export async function sessionView(root, id, ctx){
   function popAt(p){
     if(reducedMotion()) return;
     const el = q('#pop'), {x, y, s} = viewer.toCropPx(p.loc), d = 2*1.45*(p.zone.w/17)*s;
-    Object.assign(el.style, {left: `${x - d/2}px`, top: `${y - d/2}px`, width: `${d}px`, height: `${d}px`, background: TCOL[p.type] || '#fff'});
+    Object.assign(el.style, {left: `${x - d/2}px`, top: `${y - d/2}px`, width: `${d}px`, height: `${d}px`, background: PCOL[p.type] || '#fff'});
     el.hidden = false; replayClass(el, 'go');
     clearTimeout(popT); popT = setTimeout(() => { el.hidden = true; el.classList.remove('go'); }, 520);
   }
@@ -279,8 +282,8 @@ export async function sessionView(root, id, ctx){
 
   async function pitchAction(a){
     const p = pitches.find(x => x.id === selectedId); if(!p) return;
-    if(a === 'jumpT'){ if(hasVideo) vid.currentTime = (p.manual || p.glove).t; return; }
-    if(a === 'jumpL'){ if(hasVideo) vid.currentTime = p.loc.t; return; }
+    if(a === 'jumpT'){ if(hasVideo) seekTo((p.manual || p.glove).t); return; }
+    if(a === 'jumpL'){ if(hasVideo) seekTo(p.loc.t); return; }
     if(a === 'clearM'){ await savePitch({...p, manual: null}); return; }
     if(a === 'del'){ deletePitch(); return; }
     if(a === 'glove' || a === 'loc') editField = a;
@@ -348,7 +351,7 @@ export async function sessionView(root, id, ctx){
   function selectPitch(pid){
     selectedId = selectedId === pid ? null : pid; editField = null;
     const p = pitches.find(x => x.id === selectedId);
-    if(p){ source = p.manual ? 'manual' : 'glove'; if(hasVideo) vid.currentTime = p.loc.t; }
+    if(p){ source = p.manual ? 'manual' : 'glove'; if(hasVideo) seekTo(p.loc.t); }
     renderAll();
   }
   function renderTL(){
@@ -394,7 +397,7 @@ export async function sessionView(root, id, ctx){
     'relink-video': relink,
     'undo-mark': undoMark,
     'delete-pitch': deletePitch,
-    'show-all': () => { showAll = !showAll; drawStages(); },
+    'show-all': () => { showAll = showAllPref(!showAll); window.bullpen.menuState('show-all', showAll); drawStages(); },
     'frame-catcher': () => frameCatcher(),
     'redraw-zone': redrawZone,
     'delete-session': deleteSession,
@@ -433,5 +436,6 @@ export async function sessionView(root, id, ctx){
     const crop = viewer.flush(); if(crop && hasVideo) db('updateSession', S.id, {crop});
     vid.pause(); vid.removeAttribute('src'); vid.load();
   }
-  return {cleanup, onMenu: a => MENU[a]?.()};
+  window.bullpen.menuState('show-all', showAll);
+  return {cleanup, onMenu: a => { if(!MENU[a]) return false; MENU[a](); return true; }};
 }

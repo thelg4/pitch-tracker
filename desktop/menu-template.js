@@ -33,7 +33,7 @@ export function menuTemplate(send){
       { role: 'togglefullscreen' },
     ] },
     { label: 'Session', submenu: [
-      { label: 'Show All Pitches', type: 'checkbox', checked: true, click: () => send('show-all') },
+      { id: 'show-all', label: 'Show All Pitches', type: 'checkbox', checked: true, click: () => send('show-all') },
       item('Frame Catcher  C', 'frame-catcher'),
       item('Redraw Zone  Z', 'redraw-zone'),
       { type: 'separator' },

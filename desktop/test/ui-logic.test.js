@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { PCOL, pitchInk } from '../renderer/colors.js';
+import { TCOL } from '../renderer/scoring.js';
 import { AVATAR_COLORS, HUD, MIN_CLIP, initials, avatarColor, toolState, clipFor, nextSelection } from '../renderer/ui-logic.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
@@ -127,4 +129,10 @@ test('nextSelection picks the previous item when the last one is removed', () =>
 
 test('nextSelection is null when the only item is removed', () => {
   assert.equal(nextSelection([5], 5), null);
+});
+
+test('display colors cover every pitch type with a distinct dark-mode hue', () => {
+  assert.deepEqual(Object.keys(PCOL).sort(), Object.keys(TCOL).sort());
+  assert.equal(new Set(Object.values(PCOL)).size, Object.keys(PCOL).length);
+  for(const t of Object.keys(PCOL)) assert.match(pitchInk(t), /^#(000|fff)$/);
 });

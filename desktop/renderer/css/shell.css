@@ -21,11 +21,15 @@ body[data-platform=darwin] #titlebar{padding-left:78px}
 /* Body: three columns */
 #main{flex:1;min-height:0;display:flex}
 #sidebar,#inspector{flex:none;overflow:hidden;background:var(--side)}
-#app.panel-anim #sidebar,#app.panel-anim #inspector{transition:width 250ms var(--spring)} /* only on toggle, not on page change */
+/* Width springs only on toggle, not on page change. A closed panel is also hidden, so its controls leave the tab
+   order; it hides once the close finishes and shows at once on open. */
+#app.panel-anim #sidebar,#app.panel-anim #inspector{transition:width 250ms var(--spring),visibility 0s}
+#app.panel-anim[data-sidebar=closed] #sidebar,#app.panel-anim[data-inspector=closed] #inspector{transition:width 250ms var(--spring),visibility 0s 250ms}
 #sidebar{width:var(--sb-w);border-right:var(--hair)}
 #inspector{width:var(--in-w);border-left:var(--hair)}
 #app[data-sidebar=closed] #sidebar{width:0;border-right:0}
 #app[data-inspector=closed] #inspector,#app:not([data-page=session]) #inspector{width:0;border-left:0}
+#app[data-sidebar=closed] #sidebar,#app[data-inspector=closed] #inspector,#app:not([data-page=session]) #inspector{visibility:hidden}
 #sidebar>.inner{width:var(--sb-w);height:100%}
 #inspector>.inner{width:var(--in-w);height:100%;overflow-y:auto}
 #center{flex:1;min-width:0;overflow:auto;background:var(--bg);position:relative}
