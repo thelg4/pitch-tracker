@@ -45,7 +45,7 @@ app.whenReady().then(() => {
   protocol.handle('media', serveVideo);
 
   // Renderer calls go through one channel; only these db methods are reachable.
-  const DB_METHODS = ['listAthletes', 'createAthlete', 'updateAthlete', 'deleteAthlete', 'getAthlete',
+  const DB_METHODS = ['listAthletes', 'listLibrary', 'createAthlete', 'updateAthlete', 'deleteAthlete', 'getAthlete',
     'createSession', 'getSession', 'updateSession', 'deleteSession', 'rescaleSession',
     'addPitch', 'updatePitch', 'deletePitch'];
   ipcMain.handle('db', (_e, method, ...args) => {

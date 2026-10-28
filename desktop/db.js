@@ -117,6 +117,11 @@ export function openDb(file){
       return {...a, sessions: q.sessionsFor.all(id).map(r => ({...sessionRow(r), pitches: pitchesFor(r.id)}))};
     },
 
+    listLibrary(){
+      return q.athletes.all().map(r => ({...athleteRow(r),
+        sessions: q.sessionsFor.all(r.id).map(s => ({...sessionRow(s), pitches: pitchesFor(s.id)}))}));
+    },
+
     createSession({athleteId, recordedOn = null, title = '', videoPath = null, fps = 240, hitRadius = 6, cameraView = 'pitcher'}){
       const {lastInsertRowid} = q.insertSession.run({athlete_id: athleteId, recorded_on: recordedOn, title, video_path: videoPath,
         fps, hit_radius: hitRadius, camera_view: cameraView});
