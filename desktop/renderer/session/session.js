@@ -9,6 +9,7 @@ import { countTo, replayClass, reducedMotion } from '../motion.js';
 import { toolState } from '../ui-logic.js';
 import { $, $$, db, fmtDate, handLabel, toast, confirmTap, mediaUrl, basename } from '../util.js';
 import { createViewer } from './viewer.js';
+import { renderTimeline, renderList } from './timeline.js';
 
 const TOOLS = [['zone', 'Zone', 'Z'], ['target', 'Target', 'G'], ['manual', 'Manual', 'M'], ['catch', 'Catch', '']];
 
@@ -45,6 +46,11 @@ export async function sessionView(root, id){
         </div>
         <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" aria-label="Video position">
         <span class="time" id="time">0:00.00</span>
+      </div>
+      <div class="tl">
+        <div class="tlh"><div class="seg" id="viewToggle" role="group" aria-label="Pitch view"><button type="button" data-v="timeline">Timeline</button><button type="button" data-v="list">List</button></div><span class="hint" id="tlHint"></span></div>
+        <div id="timeline"></div>
+        <div class="tbl" id="log" hidden></div>
       </div>
     </section>
 
@@ -108,9 +114,8 @@ export async function sessionView(root, id){
       </section>
 
       <section class="panel">
-        <div class="panel-h"><h2>Pitch log</h2>
+        <div class="panel-h"><h2>Export</h2>
           <div class="row"><button class="btn sm" id="copyCsv">Copy CSV</button><button class="btn sm danger" id="delSession">Delete session</button></div></div>
-        <div class="tbl" id="log"></div>
         <textarea class="csv" id="csvBox" hidden readonly aria-label="CSV export"></textarea>
       </section>
     </div>`;
@@ -168,7 +173,7 @@ export async function sessionView(root, id){
   function tick(){ syncTime(); drawStages(); if(!vid.paused && !vid.ended) raf = requestAnimationFrame(tick); }
 
   const frameOf = t => Math.floor(t*S.fps + 1e-6);
-  function syncTime(){ const t = vid.currentTime; q('#scrub').value = t; q('#time').textContent = `${Math.floor(t/60)}:${(t%60).toFixed(2).padStart(5,'0')} · f${frameOf(t)}`; }
+  function syncTime(){ const t = vid.currentTime; tl?.setPlayhead(t); q('#scrub').value = t; q('#time').textContent = `${Math.floor(t/60)}:${(t%60).toFixed(2).padStart(5,'0')} · f${frameOf(t)}`; }
   // Seek to the middle of the target frame so rounding never lands on its neighbor.
   function step(n){
     if(!hasVideo) return; vid.pause();
@@ -388,22 +393,30 @@ export async function sessionView(root, id){
     q('#heat').innerHTML = heat(l); q('#trend').innerHTML = rollingTrend(l); q('#typeTbl').innerHTML = typeTable(list);
   }
   q('#filter').onchange = e => { filter = e.target.value; renderTrends(); };
-  function renderLog(){
-    if(!list.length){ q('#log').innerHTML = '<div class="empty">No pitches tagged yet. Mark the glove, then the catch, and each pitch lands here.</div>'; return; }
-    q('#log').innerHTML = `<table><thead><tr><th>#</th><th>Pitch</th><th>Target</th><th class="num">Miss</th><th class="num">Arm/Glove</th><th class="num">Up/Down</th><th>Direction</th><th>Zone</th><th class="num">Score</th></tr></thead><tbody>` +
-      list.slice().reverse().map(p => { const m = p.m;
-        return `<tr class="click ${p.id===selectedId?'sel':''}" data-id="${p.id}"><td class="mono">${p.n}</td><td><span class="dot" style="background:${TCOL[p.type]}"></span>${p.type}</td>
-        <td>${p.manual?'<span class="pill warn">Manual</span>':'<span class="pill neutral">Glove</span>'}</td>
-        <td class="num mono">${fmt(m.d)}"</td><td class="num mono">${m.arm>=0?'A':'G'} ${fmt(Math.abs(m.arm))}"</td><td class="num mono">${m.up>=0?'U':'D'} ${fmt(Math.abs(m.up))}"</td>
-        <td>${m.dir}</td><td>${m.inZone?'In':'<span style="color:var(--bad)">Out</span>'}</td><td class="num"><span class="pill ${tone(m.score)}">${m.score}</span></td></tr>`; }).join('') + '</tbody></table>';
+  /* ---------- timeline and list ---------- */
+  let tl = null, view = 'timeline';
+  try{ if(localStorage.getItem('bullpen.view') === 'list') view = 'list'; }catch{}
+  function setView(v){
+    view = v;
+    try{ localStorage.setItem('bullpen.view', v); }catch{}
+    q('#timeline').hidden = v !== 'timeline'; q('#log').hidden = v !== 'list';
+    qq('#viewToggle [data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v));
   }
-  q('#log').onclick = e => {
-    const tr = e.target.closest('tr[data-id]'); if(!tr) return;
-    const pid = +tr.dataset.id; selectedId = selectedId === pid ? null : pid; editField = null; confirmDel = false;
+  q('#viewToggle').onclick = e => { const b = e.target.closest('[data-v]'); if(b) setView(b.dataset.v); };
+  // Clicking a clip or a row selects that pitch (clicking it again deselects) and seeks to its catch frame.
+  function selectPitch(pid){
+    selectedId = selectedId === pid ? null : pid; editField = null; confirmDel = false;
     const p = pitches.find(x => x.id === selectedId);
     if(p){ source = p.manual ? 'manual' : 'glove'; if(hasVideo) vid.currentTime = p.loc.t; }
     renderAll(); q('#tagger').scrollIntoView({behavior: 'smooth', block: 'nearest'});
-  };
+  }
+  function renderTL(){
+    q('#tlHint').textContent = `${list.length} pitch${list.length === 1 ? '' : 'es'} · drag to scrub · click a pitch to jump`;
+    tl = renderTimeline(q('#timeline'), list, vid.duration, {selectedId, onSelect: selectPitch,
+      onScrub: t => { if(hasVideo){ vid.pause(); vid.currentTime = t; } }});
+    tl.setPlayhead(vid.currentTime || 0);
+    renderList(q('#log'), list, {selectedId, onSelect: selectPitch});
+  }
   function csv(){
     const q = s => '"' + String(s).replace(/"/g, '""') + '"';
     const head = 'athlete,date,pitch,type,target_source,miss_in,arm_side_in,up_in,direction,in_zone,hit,score,setup_offset_in,catch_time_s';
@@ -438,7 +451,9 @@ export async function sessionView(root, id){
   }
   document.addEventListener('keydown', onKey);
 
-  function renderAll(){ renderSettings(); renderTagger(); renderBoard(); renderTrends(); renderLog(); drawStages(); }
+  function renderAll(){ renderSettings(); renderTagger(); renderBoard(); renderTrends(); renderTL(); drawStages(); }
+  vid.addEventListener('timeupdate', syncTime);
+  setView(view);
   loadVideo(); refresh();
 
   function cleanup(){
@@ -446,5 +461,6 @@ export async function sessionView(root, id){
     const crop = viewer.flush(); if(crop && hasVideo) db('updateSession', S.id, {crop});
     vid.pause(); vid.removeAttribute('src'); vid.load();
   }
-  return {cleanup, onMenu(){}};  // Task 9 wires the session's menu actions into onMenu.
+  // Task 9 wires the rest of the session's menu actions into onMenu.
+  return {cleanup, onMenu(a){ if(a === 'toggle-list') setView(view === 'list' ? 'timeline' : 'list'); }};
 }

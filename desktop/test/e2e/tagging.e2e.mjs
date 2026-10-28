@@ -75,6 +75,11 @@ try {
     await page.waitForTimeout(150);
   }
 
+  // The timeline shows one clip per pitch; the table lives behind the List toggle.
+  await page.click('#viewToggle [data-v="timeline"]'); // the choice persists in localStorage between runs
+  assert.equal(await page.$$eval('#timeline .clip', c => c.length), 6);
+  await page.screenshot({ path: `${OUT}/timeline.png` });
+  await page.click('#viewToggle [data-v="list"]');
   const rows = await page.$$eval('#log tbody tr', rs => rs.map(r => [...r.cells].map(c => c.textContent.trim()).join(' | ')));
   const expected = ['A 2.0"/U 1.0"', 'A 7.0"/U 3.0"', 'G 4.0"/D 6.0"', 'A 3.0"/D 2.0"', 'A 0.0"/U 0.5"', 'G 1.0"/D 9.0"'];
   assert.equal(rows.length, expected.length, `log rows: ${rows.join(' ; ')}`);
