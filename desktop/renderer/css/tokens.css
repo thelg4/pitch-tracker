@@ -11,7 +11,7 @@
   --f-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --sb-w:200px; --in-w:240px; --tb-h:44px;
 
-  /* Names the pre-redesign views still use (styles.css); they map onto the palette above. */
+  /* Older names the chart builders and shared content rules still use; they map onto the palette above. */
   --paper:var(--bg); --surface:var(--side); --sunk:var(--bar); --ink:var(--txt); --muted:var(--dim);
   --line:rgba(255,255,255,.09); --accent:var(--blue); --accent-ink:#fff; --stage:#000; --stage-ink:rgba(255,255,255,.65);
   --good:var(--green); --warn:var(--orange); --bad:var(--red);

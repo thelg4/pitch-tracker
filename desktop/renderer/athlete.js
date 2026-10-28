@@ -5,7 +5,7 @@ import { scored, summary, insights, grade, tone, fmt, GRADE_TXT } from './scorin
 import { scatter, legend, heat, sessionTrend, typeTable } from './charts.js';
 import { setToolbar } from './shell.js';
 import { openSheet } from './sheets.js';
-import { countTo } from './motion.js';
+import { countTo, settleCount } from './motion.js';
 import { nextSelection } from './ui-logic.js';
 import { $, db, esc, fmtDate, toast, basename } from './util.js';
 
@@ -94,13 +94,13 @@ export async function athleteView(root, id, ctx){
     const score = q('#bigScore');
     if(sm.n){
       const sc = Math.round(sm.score), gr = grade(sm.score);
-      if(first) score.textContent = '0';
+      if(first) settleCount(score, '0');
       countTo(score, sc); score.style.color = `var(--${tone(sc)})`;
       q('#gradePill').className = 'pill ' + tone(sc); q('#gradePill').textContent = `${gr} grade`; q('#gradeTxt').textContent = GRADE_TXT[gr];
       q('#sHit').textContent = Math.round(sm.hit*100) + '%'; q('#sMiss').textContent = fmt(sm.d) + '"';
       q('#sZone').textContent = Math.round(sm.zone*100) + '%'; q('#sN').textContent = sm.n;
     }else{
-      score.textContent = '–'; score.style.color = '';
+      settleCount(score, '–'); score.style.color = '';
       q('#gradePill').className = 'pill neutral'; q('#gradePill').textContent = '–'; q('#gradeTxt').textContent = 'Tag pitches in a session to get a score.';
       for(const i of ['#sHit', '#sMiss', '#sZone', '#sN']) q(i).textContent = '–';
     }
@@ -135,11 +135,7 @@ export async function athleteView(root, id, ctx){
     const next = nextSelection(ctx.library.map(x => x.id), id);
     ctx.go(next ? '#/athlete/' + next : '#/');
   };
-  bar('#newSession').onclick = async () => {
-    const file = await window.bullpen.chooseVideo(); if(!file || dead) return;
-    const s = await db('createSession', {athleteId: id, videoPath: file, title: basename(file)});
-    location.hash = '#/session/' + s.id;
-  };
+  bar('#newSession').onclick = () => ctx.newSession(id);
 
-  return () => { dead = true; };
+  return {cleanup: () => { dead = true; settleCount(q('#bigScore')); }, onMenu: a => { if(a === 'new-session') ctx.newSession(id); }};
 }

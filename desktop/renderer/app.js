@@ -5,7 +5,7 @@ import { renderSidebar } from './sidebar.js';
 import { setTitle, setToolbar, setInspector, togglePanel, restorePanels, setPage } from './shell.js';
 import { openSheet } from './sheets.js';
 import { replayClass } from './motion.js';
-import { $, db, esc, fmtDate, handLabel } from './util.js';
+import { $, db, esc, fmtDate, handLabel, basename } from './util.js';
 
 document.body.dataset.platform = window.bullpen.platform;
 restorePanels();
@@ -18,11 +18,25 @@ let library = [];
 let active = {};      // the mounted view: {cleanup?, onMenu?}
 let shownKey = '';    // which page #center shows, so a reload of the same page doesn't crossfade
 let seq = 0;          // drops a route whose data arrives after a newer navigation
+let sbSel = {athleteId: null, sessionId: null}; // what the sidebar highlights
 
 const ctx = {
   get library(){ return library; },
   reload: () => route(),
   go(hash){ if(location.hash === hash) route(); else location.hash = hash; },
+  // Redraw only the sidebar from fresh data (a session's score or date changed), without remounting the view.
+  async refreshSidebar(){
+    const my = seq, lib = await db('listLibrary');
+    if(my !== seq) return;
+    library = lib; drawSidebar(sbSel.athleteId, sbSel.sessionId);
+  },
+  // Choose a video, create a session for the athlete with it, and open it.
+  async newSession(athleteId){
+    const my = seq, file = await window.bullpen.chooseVideo();
+    if(!file || my !== seq) return;
+    const s = await db('createSession', {athleteId, videoPath: file, title: basename(file)});
+    ctx.go('#/session/' + s.id);
+  },
 };
 
 // A view returns a cleanup function or {cleanup, onMenu}.
@@ -72,6 +86,7 @@ async function route(){
 }
 
 function drawSidebar(athleteId, sessionId){
+  sbSel = {athleteId, sessionId};
   renderSidebar($('#sidebar .inner'), library, {athleteId, sessionId}, {
     onAthlete: id => ctx.go('#/athlete/' + id),
     onSession: id => ctx.go('#/session/' + id),
@@ -100,9 +115,12 @@ async function newAthlete(){
   ctx.go('#/athlete/' + a.id);
 }
 
+const SCORE_HELP = `<p>Miss distance is measured in inches from the target to where the ball is caught, using the 17-inch plate width from your zone box as the ruler. A pitch within a third of the hit radius scores 100. The score falls in a straight line to 0 at three times the hit radius. With the default 6" radius, a 6" miss scores 75 and anything 18" or more scores 0. The command score is the average across all tagged pitches, and the grade puts it on the 20–80 scouting scale.</p>`;
+
 const isSession = () => $('#app').dataset.page === 'session';
 const menu = {
   'new-athlete': newAthlete,
+  'help-score': () => openSheet({title: 'How the Score Works', body: SCORE_HELP, confirmLabel: 'Done', cancelLabel: ''}),
   'toggle-sidebar': () => togglePanel('sidebar'),
   'toggle-inspector': () => { if(isSession()) togglePanel('inspector'); },
   'show-db': () => window.bullpen.revealDb(),

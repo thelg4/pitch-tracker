@@ -35,8 +35,9 @@ export function heat(list){
 }
 
 // Line chart of 0–100 values. points: [{v, dotV?, color?, label, title}]; the line is `v`, dots are `dotV ?? v`.
-function lineChart(points, aria){
-  const W=560, H=220, L=30, B=24, T=10, Rr=10, n=points.length;
+// size {w, h} sets the viewBox, so a narrow panel can draw it at a scale where its labels stay readable.
+function lineChart(points, aria, {w: W = 560, h: H = 220} = {}){
+  const L=30, B=24, T=10, Rr=10, n=points.length;
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${aria}">`;
   const x = i => L + (n<=1 ? (W-L-Rr)/2 : i*(W-L-Rr)/(n-1)), y = v => T + (100-v)*(H-T-B)/100;
   [0,25,50,75,100].forEach(v => svg += `<line stroke="rgba(255,255,255,.07)" x1="${L}" x2="${W-Rr}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3}" text-anchor="end">${v}</text>`);
@@ -52,10 +53,10 @@ function lineChart(points, aria){
   return svg + '</svg>';
 }
 
-// Pitch-by-pitch score with a 5-pitch rolling average.
-export function rollingTrend(list){
+// Pitch-by-pitch score with a 5-pitch rolling average. `size` is passed to lineChart.
+export function rollingTrend(list, size){
   const roll = list.map((_,i) => { const w = list.slice(Math.max(0,i-4),i+1); return w.reduce((a,p)=>a+p.m.score,0)/w.length; });
-  return lineChart(list.map((p,i) => ({v: roll[i], dotV: p.m.score, color: TCOL[p.type], label: '#'+p.n, title: `#${p.n} ${p.type}: ${p.m.score}`})), 'Score by pitch');
+  return lineChart(list.map((p,i) => ({v: roll[i], dotV: p.m.score, color: TCOL[p.type], label: '#'+p.n, title: `#${p.n} ${p.type}: ${p.m.score}`})), 'Score by pitch', size);
 }
 
 // Command score per session, oldest first. sessions: [{recordedOn, list}]

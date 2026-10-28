@@ -57,6 +57,12 @@ test('editing the location of a selected pitch activates catch with an editing H
   assert.equal(s.hud, 'Editing #4');
 });
 
+test('re-marking the location enables catch even when the mode is not location', () => {
+  const s = toolState({mode: 'target', hasZone: true, hasVideo: true, draft: noDraft, selected: {n: 4}, editField: 'loc'});
+  assert.equal(s.active, 'catch');
+  assert.equal(s.catchEnabled, true);
+});
+
 test('editing the glove of a selected pitch activates target', () => {
   const s = toolState({mode: 'location', hasZone: true, hasVideo: true, draft: noDraft, selected: {n: 4}, editField: 'glove'});
   assert.equal(s.active, 'target');

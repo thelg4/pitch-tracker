@@ -20,8 +20,9 @@ export function avatarColor(name){
 }
 
 // Which toolbar tool is active and what the HUD says. Video, then editing, then zone, then mode decide.
+// Catch is enabled once a target is placed, or while a selected pitch's location is being re-marked.
 export function toolState({mode, hasZone, hasVideo, selected, editField}){
-  const catchEnabled = mode === 'location';
+  const catchEnabled = mode === 'location' || editField === 'loc';
   if(!hasVideo) return {active:null, catchEnabled, hud:HUD.noVideo};
   if(selected) return {active: TOOL_FOR_FIELD[editField] ?? null, catchEnabled, hud:`Editing #${selected.n}`};
   const tool = hasZone ? TOOL_FOR_MODE[mode] : 'zone';

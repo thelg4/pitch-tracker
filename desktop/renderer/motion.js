@@ -20,6 +20,13 @@ export function countTo(el, to, ms = 600){
   counting.set(el, requestAnimationFrame(step));
 }
 
+// Stop a running count on `el`, so a later direct write (such as '–') is not overwritten by it.
+// With `text`, the element is left showing that text.
+export function settleCount(el, text){
+  cancelAnimationFrame(counting.get(el)); counting.delete(el);
+  if(text !== undefined) el.textContent = text;
+}
+
 // Restart a CSS animation class: remove it, force a reflow, add it back.
 export function replayClass(el, cls){
   el.classList.remove(cls);

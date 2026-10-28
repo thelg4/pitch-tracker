@@ -28,6 +28,7 @@ try {
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
   await page.setViewportSize({ width: 1440, height: 1000 });
+  const menu = action => app.evaluate(({ BrowserWindow }, a) => BrowserWindow.getAllWindows()[0].webContents.send('menu', a), action);
 
   await page.waitForSelector('.sb-athlete[data-id]');
   await page.screenshot({ path: `${OUT}/1-roster.png` });
@@ -57,10 +58,15 @@ try {
   // Draw the zone over the plate: 170 px wide = 17 in -> 10 px/in.
   const [zx1, zy1] = onCrop(455, 1110), [zx2, zy2] = onCrop(625, 1400);
   await page.mouse.move(zx1, zy1); await page.mouse.down(); await page.mouse.move((zx1 + zx2) / 2, (zy1 + zy2) / 2); await page.mouse.move(zx2, zy2); await page.mouse.up();
-  // Drawing the zone moves the tool control to Target. Task 9 adds the exact #zonePpi check back.
+  // Drawing the zone moves the tool control to Target, and the Session tab shows the scale.
   await page.waitForFunction(() => document.querySelector('#tools [data-tool="target"]')?.getAttribute('aria-pressed') === 'true');
   assert.equal(await page.$eval('#tools [data-tool="zone"]', e => e.getAttribute('aria-pressed')), 'false');
   assert.match(await page.$eval('#toast', e => e.textContent), /Zone set · 10\.0 px per inch/);
+  await menu('inspector-session');
+  await page.waitForSelector('#zonePpi', { state: 'visible' });
+  assert.equal(await page.$eval('#zonePpi', e => e.textContent.trim()), '10.0 px/in');
+  await menu('inspector-pitch');
+  await page.waitForSelector('#types [data-t]', { state: 'visible' });
   crop = { cx: 540, cy: 1255, w: Math.min(FW, Math.max(170 * 5, 290 * 2.4 * asp)) }; // frameCatcher() after the zone is drawn
 
   // Tag pitches: glove target, step frames, catch. Offsets are inches (arm side +x for a RHP from behind, up = -y).
@@ -103,14 +109,19 @@ try {
   rows.reverse().forEach((r, i) => assert.ok(r.includes(expected[i].replace('/', ' | ')), `pitch ${i + 1} row "${r}" should read ${expected[i]}`));
   await page.waitForTimeout(700); // let the score count-up finish
   assert.equal(await page.$eval('#bigScore', e => e.textContent.trim()), '80');
-  assert.equal(await page.$eval('#sN', e => e.textContent.trim()), '6');
   await page.screenshot({ path: `${OUT}/session.png` });
   await page.screenshot({ path: `${OUT}/3-session.png`, fullPage: true });
+  await menu('inspector-session');
+  await page.waitForSelector('#sN', { state: 'visible' });
+  assert.equal(await page.$eval('#sN', e => e.textContent.trim()), '6');
+  await page.waitForTimeout(500); // let the chart draw-in finish
+  await page.screenshot({ path: `${OUT}/session-tab.png` });
+  await menu('inspector-pitch');
 
   // Keys pressed inside an open sheet must not reach the session's shortcuts.
   const timeBefore = await page.$eval('#time', e => e.textContent);
   const openNewAthlete = async () => {
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].webContents.send('menu', 'new-athlete'));
+    await menu('new-athlete');
     await page.waitForSelector('#sheetHost form [data-cancel]');
   };
   await openNewAthlete();
