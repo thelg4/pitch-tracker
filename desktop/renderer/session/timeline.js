@@ -5,7 +5,6 @@ import { TCOL, fmt, tone } from '../scoring.js';
 import { clipFor } from '../ui-logic.js';
 
 const maxRendered = new WeakMap();   // lane element -> highest pitch id drawn so far
-const DARK_TEXT = new Set(['#30d158', '#ffd60a', '#64d2ff']);
 
 export function renderTimeline(el, list, duration, {selectedId, onSelect, onScrub}){
   const ok = Number.isFinite(duration) && duration > 0;
@@ -16,8 +15,10 @@ export function renderTimeline(el, list, duration, {selectedId, onSelect, onScru
     clips = list.map(p => {
       const c = clipFor(p, duration), col = TCOL[p.type] || '#888';
       const fresh = prev !== undefined && p.id > prev;
+      // A marker is centered on the catch by its CSS (fixed width, translateX(-50%), clamped inside the lane).
+      const pos = c.marker ? `left:clamp(12px,${(p.loc.t / duration) * 100}%,calc(100% - 12px));` : `left:${c.left * 100}%;width:${c.width * 100}%;`;
       return `<div class="clip${fresh ? ' in' : ''}${p.id === selectedId ? ' sel' : ''}${c.marker ? ' marker' : ''}" data-id="${p.id}" role="button" tabindex="-1" title="#${p.n} ${p.type} · ${p.m.score}"
-        style="left:${c.left * 100}%;width:${c.width * 100}%;background:${col};${DARK_TEXT.has(col) ? 'color:#000;' : ''}">#${p.n}<small>${p.m.score}</small></div>`;
+        style="${pos}background:${col}">#${p.n}<small>${p.m.score}</small></div>`;
     }).join('');
     maxRendered.set(el, Math.max(prev ?? -1, ...list.map(p => p.id)));
   }

@@ -114,7 +114,7 @@ export async function sessionView(root, id){
       </section>
 
       <section class="panel">
-        <div class="panel-h"><h2>Export</h2>
+        <div class="panel-h"><h2>Session</h2>
           <div class="row"><button class="btn sm" id="copyCsv">Copy CSV</button><button class="btn sm danger" id="delSession">Delete session</button></div></div>
         <textarea class="csv" id="csvBox" hidden readonly aria-label="CSV export"></textarea>
       </section>

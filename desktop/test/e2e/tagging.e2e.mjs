@@ -79,6 +79,22 @@ try {
   await page.click('#viewToggle [data-v="timeline"]'); // the choice persists in localStorage between runs
   assert.equal(await page.$$eval('#timeline .clip', c => c.length), 6);
   await page.screenshot({ path: `${OUT}/timeline.png` });
+  // A marker (no glove release before the catch) is centered on its catch, stacks above spans, and stays inside the lane.
+  const mk = await page.evaluate(async () => {
+    const { renderTimeline } = await import('./session/timeline.js');
+    const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:0;width:800px;z-index:99';
+    document.body.append(host);
+    const P = (id, g, t) => ({ id, n: id, type: 'FB', glove: g === null ? null : { t: g }, loc: { t }, m: { score: 50 } });
+    renderTimeline(host, [P(1, null, 5), P(2, 4, 6), P(3, null, 0), P(4, null, 10), P(5, 4, 6.5)], 10, { selectedId: null, onSelect() {}, onScrub() {} });
+    const lane = host.querySelector('.lane').getBoundingClientRect();
+    const out = [...host.querySelectorAll('.clip')].map(c => { const r = c.getBoundingClientRect(); return { id: +c.dataset.id, cx: r.left + r.width / 2 - lane.left, l: r.left - lane.left, r: r.right - lane.left, z: getComputedStyle(c).zIndex, w: r.width }; });
+    host.remove(); return { out, lane: lane.width };
+  });
+  const byId = Object.fromEntries(mk.out.map(c => [c.id, c]));
+  assert.ok(Math.abs(byId[1].cx - 400) <= 1, `marker center ${byId[1].cx}`);
+  assert.ok(byId[3].l >= -0.5 && byId[4].r <= mk.lane + 0.5, 'end markers stay inside the lane');
+  assert.ok(Number(byId[1].z) > (Number(byId[2].z) || 0), 'markers stack above spans');
+  assert.ok(Math.abs(byId[2].l - 320) <= 1 && Math.abs(byId[2].r - 480) <= 1, 'a span keeps its clipFor extent');
   await page.click('#viewToggle [data-v="list"]');
   const rows = await page.$$eval('#log tbody tr', rs => rs.map(r => [...r.cells].map(c => c.textContent.trim()).join(' | ')));
   const expected = ['A 2.0"/U 1.0"', 'A 7.0"/U 3.0"', 'G 4.0"/D 6.0"', 'A 3.0"/D 2.0"', 'A 0.0"/U 0.5"', 'G 1.0"/D 9.0"'];
