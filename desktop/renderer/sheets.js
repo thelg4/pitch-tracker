@@ -9,13 +9,13 @@ let current = null; // {close(result)}
 
 export const isOpen = () => current !== null;
 
-export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Cancel', destructive = false}){
+export function openSheet({title, body, confirmLabel = 'OK', cancelLabel = 'Cancel', destructive = false, className = ''}){
   current?.close(null);
   const host = document.getElementById('sheetHost'), app = document.getElementById('app');
   const returnFocus = document.activeElement;
   host.classList.remove('closing', 'open');
   host.innerHTML = `<div class="sheet-backdrop"></div>
-    <form class="sheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <form class="sheet ${className}" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
       <h2 id="sheetTitle">${esc(title)}</h2>
       <div class="sheet-body">${body}</div>
       <div class="sheet-actions">

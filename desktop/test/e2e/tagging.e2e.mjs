@@ -15,6 +15,8 @@ const electronBin = createRequire(path.join(APP, 'package.json'))('electron');
 
 execFileSync(path.join(HERE, 'make-clip.sh'), { stdio: 'inherit' });
 for (const f of [DB, DB + '-wal', DB + '-shm']) fs.rmSync(f, { force: true });
+const PROFILE = path.join(OUT, 'profile'); // a fresh profile each run: a first launch, whatever the real app has stored
+fs.rmSync(PROFILE, { recursive: true, force: true });
 const menu2 = (app, action) => app.evaluate(({ BrowserWindow }, a) => BrowserWindow.getAllWindows()[0].webContents.send('menu', a), action);
 const asNode = code => execFileSync(electronBin, ['--input-type=module', '-e', code], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, cwd: APP }).toString();
 
@@ -22,7 +24,7 @@ asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)});
   const a = d.createAthlete({name:'Test Pitcher', throws:'R', level:'College'});
   d.createSession({athleteId:a.id, videoPath:${JSON.stringify(VIDEO)}, title:'test_hevc.mov', fps:60, recordedOn:'2026-10-27'}); d.close();`);
 
-const app = await electron.launch({ executablePath: electronBin, args: [APP], env: { ...process.env, BULLPEN_DB: DB } });
+const app = await electron.launch({ executablePath: electronBin, args: [APP], env: { ...process.env, BULLPEN_DB: DB, BULLPEN_USER_DATA: PROFILE } });
 try {
   const page = await app.firstWindow();
   const errors = [];
@@ -31,7 +33,25 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const menu = action => app.evaluate(({ BrowserWindow }, a) => BrowserWindow.getAllWindows()[0].webContents.send('menu', a), action);
 
-  await page.waitForSelector('.sb-athlete[data-id]');
+  // Welcome: opens on the first launch of this version, never again after that unless asked for.
+  const version = await app.evaluate(({ app }) => app.getVersion());
+  await page.waitForSelector('body[data-launched]', { state: 'attached' });
+  await page.waitForSelector('#sheetHost .welcome');
+  assert.match(await page.$eval('#sheetHost .wver', e => e.textContent), new RegExp(`Version ${version.replaceAll('.', '\\.')}\\s+Pre-alpha`));
+  assert.equal(await page.$eval('#sheetHost [type=submit]', e => e.textContent), 'Get Started'); // the library already has an athlete
+  assert.equal(await page.$eval('#sheetHost [name=always]', e => e.checked), false);
+  await page.waitForTimeout(350); // let the slide-down settle before the screenshot
+  await page.screenshot({ path: `${OUT}/0-welcome.png` });
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => !document.querySelector('#sheetHost form'));
+  await page.reload();
+  await page.waitForSelector('body[data-launched]', { state: 'attached' });
+  assert.equal(await page.$('#sheetHost form'), null, 'the welcome does not reopen once this version has been seen');
+  await menu('welcome');
+  await page.waitForSelector('#sheetHost .welcome');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#sheetHost form'));
+
   await page.screenshot({ path: `${OUT}/1-roster.png` });
   await page.click('.sb-athlete[data-id]');
   await page.waitForSelector('.sb-session[data-id]');
@@ -319,6 +339,17 @@ try {
 
   // 5. Delete the current session: confirm the sheet with Return; the app goes to the athlete and the sidebar drops it.
   await openSession(1);
+  // The Session tab's Delete Session… button asks first; Escape keeps the session.
+  await menu('inspector-session');
+  await page.waitForSelector('#delSession', { state: 'visible' });
+  await page.click('#delSession');
+  await page.waitForSelector('#sheetHost form [type=submit]');
+  assert.equal(await page.$eval('#sheetTitle', e => e.textContent), 'Delete This Session?');
+  assert.equal(await page.$eval('#sheetHost [type=submit]', e => e.textContent), 'Delete Session');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('#sheetHost form'));
+  assert.equal(await page.evaluate(() => location.hash), '#/session/1');
+  assert.equal(asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)}); console.log(!!d.getSession(1)); d.close();`).trim(), 'true', 'Escape keeps the session');
   // One press of Space must never confirm a destructive sheet.
   await menu('delete-session');
   await page.waitForSelector('#sheetHost form [type=submit]');
@@ -355,7 +386,7 @@ const rmId = +asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.st
   const s = d.createSession({athleteId:1, videoPath:${JSON.stringify(VIDEO)}, title:'test_hevc.mov', fps:60, recordedOn:'2026-10-28'});
   d.updateSession(s.id, {frameW:1080, frameH:1920, zone:{x:455, y:1110, w:170, h:290}, crop:{cx:540, cy:1255, w:900}});
   console.log(s.id); d.close();`).trim();
-const app2 = await electron.launch({ executablePath: electronBin, args: [APP], env: { ...process.env, BULLPEN_DB: DB } });
+const app2 = await electron.launch({ executablePath: electronBin, args: [APP], env: { ...process.env, BULLPEN_DB: DB, BULLPEN_USER_DATA: PROFILE } });
 try {
   const page = await app2.firstWindow();
   const errors = [];

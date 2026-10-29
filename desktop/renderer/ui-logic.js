@@ -46,3 +46,6 @@ export function nextSelection(ids, removedId){
   if(i < 0) return null;
   return ids[i+1] ?? ids[i-1] ?? null;
 }
+
+// Whether the welcome sheet opens at launch: the first time this version runs, or every launch if asked for.
+export const welcomeDue = ({seen, always} = {}, version) => !!always || seen !== version;

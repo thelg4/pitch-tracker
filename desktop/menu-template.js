@@ -39,6 +39,6 @@ export function menuTemplate(send){
       { type: 'separator' },
       item('Delete Session…', 'delete-session'),
     ] },
-    { label: 'Help', submenu: [item('How the Score Works', 'help-score')] },
+    { label: 'Help', submenu: [item('Welcome to Bullpen Command', 'welcome'), item('How the Score Works', 'help-score')] },
   ];
 }

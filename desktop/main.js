@@ -9,6 +9,8 @@ import { menuTemplate } from './menu-template.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VIDEO_EXT = ['mov', 'mp4', 'm4v'];
 let db;
+// Tests run in their own profile (window prefs, welcome state) so they never share or lock the real one.
+if(process.env.BULLPEN_USER_DATA) app.setPath('userData', process.env.BULLPEN_USER_DATA);
 const picked = new Set(); // videos chosen this run that aren't attached to a session yet
 
 // media://video/<encoded absolute path> streams a local video with byte-range support so seeking works.
@@ -33,8 +35,10 @@ function createWindow(){
   const win = new BrowserWindow({
     width: 1440, height: 960, minWidth: 1000, minHeight: 700,
     title: 'Bullpen Command', backgroundColor: '#1c1c1e', titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    show: false, // shown once the first frame is painted, so launch never flashes an empty window
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true },
   });
+  win.once('ready-to-show', () => win.show());
   win.webContents.setWindowOpenHandler(({ url }) => { if(/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('will-navigate', e => e.preventDefault());
   win.loadFile(path.join(here, 'renderer', 'index.html'));
@@ -70,7 +74,8 @@ app.whenReady().then(() => {
   });
   // Lets the session say a video is missing without requesting it (a 404 from media:// logs a console error).
   ipcMain.handle('video-exists', (_e, file) => (picked.has(file) || db.hasVideo(file)) && fs.existsSync(file));
-  ipcMain.handle('reveal-db', () => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
+  ipcMain.handle('app-version', () => app.getVersion());
+  ipcMain.handle('reveal-db',() => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
 
   ipcMain.on('menu-state', (_e, id, checked) => { const it = Menu.getApplicationMenu()?.getMenuItemById(id); if(it) it.checked = !!checked; });
   Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(a => BrowserWindow.getFocusedWindow()?.webContents.send('menu', a))));

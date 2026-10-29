@@ -8,7 +8,7 @@ function collect(items, out = []){
 }
 const ACTIONS = ['new-athlete', 'new-session', 'relink-video', 'show-db', 'export-csv', 'undo-mark', 'delete-pitch',
   'toggle-sidebar', 'toggle-inspector', 'toggle-list', 'inspector-pitch', 'inspector-session',
-  'show-all', 'frame-catcher', 'redraw-zone', 'delete-session', 'help-score'];
+  'show-all', 'frame-catcher', 'redraw-zone', 'delete-session', 'welcome', 'help-score'];
 
 test('every clickable item sends exactly its action', () => {
   const sent = [];
@@ -40,5 +40,5 @@ test('no bare single-key accelerators', () => {
 
 test('spec labels are pinned', () => {
   const labels = collect(menuTemplate(() => {})).map(i => i.label);
-  for(const l of ['Show Database File', 'Export CSV', 'Timeline/List', 'Delete Session…', 'How the Score Works']) assert.ok(labels.includes(l), l);
+  for(const l of ['Show Database File', 'Export CSV', 'Timeline/List', 'Delete Session…', 'Welcome to Bullpen Command', 'How the Score Works']) assert.ok(labels.includes(l), l);
 });
