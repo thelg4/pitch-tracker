@@ -1,7 +1,7 @@
 {
   "name": "bullpen-command",
   "productName": "Bullpen Command",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Measure pitch command from bullpen video and track athletes over time.",
   "author": "thelg4",
   "license": "UNLICENSED",

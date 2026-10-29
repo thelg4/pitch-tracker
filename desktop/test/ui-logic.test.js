@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PCOL, pitchInk } from '../renderer/colors.js';
 import { TCOL } from '../renderer/scoring.js';
-import { AVATAR_COLORS, HUD, MIN_CLIP, initials, avatarColor, toolState, clipFor, nextSelection } from '../renderer/ui-logic.js';
+import { AVATAR_COLORS, HUD, MIN_CLIP, initials, avatarColor, toolState, clipFor, nextSelection, welcomeDue } from '../renderer/ui-logic.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} is not ${b}`);
 const pt = t => ({x: 0, y: 0, t});
@@ -135,4 +135,12 @@ test('display colors cover every pitch type with a distinct dark-mode hue', () =
   assert.deepEqual(Object.keys(PCOL).sort(), Object.keys(TCOL).sort());
   assert.equal(new Set(Object.values(PCOL)).size, Object.keys(PCOL).length);
   for(const t of Object.keys(PCOL)) assert.match(pitchInk(t), /^#(000|fff)$/);
+});
+
+test('the welcome shows the first time a version runs, then only when asked for at every launch', () => {
+  assert.equal(welcomeDue({}, '0.2.1'), true);
+  assert.equal(welcomeDue({seen: '0.2.0'}, '0.2.1'), true);
+  assert.equal(welcomeDue({seen: '0.2.1'}, '0.2.1'), false);
+  assert.equal(welcomeDue({seen: '0.2.1', always: true}, '0.2.1'), true);
+  assert.equal(welcomeDue({seen: '0.2.1', always: false}, '0.2.1'), false);
 });

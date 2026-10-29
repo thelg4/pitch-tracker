@@ -5,6 +5,7 @@ import { renderSidebar } from './sidebar.js';
 import { setTitle, setToolbar, setInspector, togglePanel, restorePanels, setPage } from './shell.js';
 import { openSheet, isOpen as sheetOpen } from './sheets.js';
 import { replayClass } from './motion.js';
+import { welcomeAtLaunch, showWelcome } from './welcome.js';
 import { $, db, esc, fmtDate, handLabel, basename, toast, showAllPref } from './util.js';
 
 document.body.dataset.platform = window.bullpen.platform;
@@ -121,6 +122,7 @@ const SCORE_HELP = `<p>Miss distance is measured in inches from the target to wh
 const isSession = () => $('#app').dataset.page === 'session';
 const menu = {
   'new-athlete': newAthlete,
+  'welcome': () => showWelcome(welcomeOpts()),
   'help-score': () => openSheet({title: 'How the Score Works', body: SCORE_HELP, confirmLabel: 'Done', cancelLabel: ''}),
   'toggle-sidebar': () => togglePanel('sidebar'),
   'toggle-inspector': () => { if(isSession()) togglePanel('inspector'); },
@@ -143,4 +145,6 @@ $('#tglSidebar').onclick = () => togglePanel('sidebar');
 $('#tglInspector').onclick = () => togglePanel('inspector');
 
 window.addEventListener('hashchange', route);
-route();
+const welcomeOpts = () => ({hasAthletes: library.length > 0, newAthlete});
+// body[data-launched] marks the first route and the welcome check as done.
+route().then(() => welcomeAtLaunch(welcomeOpts())).catch(e => console.error(e)).finally(() => { document.body.dataset.launched = ''; });
