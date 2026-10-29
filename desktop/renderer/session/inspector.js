@@ -93,7 +93,7 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
 
 /* ---------- Session tab ---------- */
 
-export function renderSessionTab(el, {session: S, list, filter, onSetting, onFilter}){
+export function renderSessionTab(el, {session: S, list, filter, onSetting, onFilter, onDelete}){
   if(!el.firstChild){
     el.innerHTML = `
       <section class="isec"><div class="lab">Session</div>
@@ -113,8 +113,10 @@ export function renderSessionTab(el, {session: S, list, filter, onSetting, onFil
         <div class="ichart"><span class="lbl">Hit rate by target</span><div id="heat"></div></div>
         <div class="ichart"><span class="lbl">Score (5-pitch rolling)</span><div id="trend"></div></div>
         <div class="ichart"><span class="lbl">By pitch type</span><div class="tbl itbl" id="typeTbl"></div></div>
-      </section>`;
+      </section>
+      <section class="isec iacts"><button type="button" class="btn danger" id="delSession">Delete Session…</button></section>`;
   }
+  $(el, '#delSession').onclick = onDelete;
 
   // Settings
   $(el, '#date').value = S.recordedOn || ''; $(el, '#view').value = S.cameraView;

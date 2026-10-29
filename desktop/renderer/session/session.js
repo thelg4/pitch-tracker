@@ -335,7 +335,7 @@ export async function sessionView(root, id, ctx){
   function renderSessionPane(){
     if(filter !== 'ALL' && !list.some(p => p.type === filter)) filter = 'ALL';
     renderSessionTab(iq('#inspSession'), {session: S, list, filter, onSetting: changeSetting,
-      onFilter: t => { filter = t; renderSessionPane(); }});
+      onFilter: t => { filter = t; renderSessionPane(); }, onDelete: () => deleteSession()});
   }
 
   /* ---------- timeline and list ---------- */
