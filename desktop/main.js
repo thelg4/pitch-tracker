@@ -42,6 +42,8 @@ function createWindow(){
 }
 
 app.whenReady().then(() => {
+  // The packaged app takes its icon from build/icon.icns; `npm start` would otherwise show Electron's.
+  if(!app.isPackaged && process.platform === 'darwin') app.dock.setIcon(path.join(here, 'build', 'icon.png'));
   db = openDb(process.env.BULLPEN_DB || path.join(app.getPath('userData'), 'bullpen.db'));
   protocol.handle('media', serveVideo);
 
