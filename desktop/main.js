@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, protocol, shell, Menu } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
+import { menuTemplate } from './menu-template.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VIDEO_EXT = ['mov', 'mp4', 'm4v'];
@@ -31,7 +32,7 @@ function serveVideo(req){
 function createWindow(){
   const win = new BrowserWindow({
     width: 1440, height: 960, minWidth: 1000, minHeight: 700,
-    title: 'Bullpen Command', backgroundColor: '#0C1420', titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    title: 'Bullpen Command', backgroundColor: '#1c1c1e', titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true },
   });
   win.webContents.setWindowOpenHandler(({ url }) => { if(/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
@@ -45,7 +46,7 @@ app.whenReady().then(() => {
   protocol.handle('media', serveVideo);
 
   // Renderer calls go through one channel; only these db methods are reachable.
-  const DB_METHODS = ['listAthletes', 'createAthlete', 'updateAthlete', 'deleteAthlete', 'getAthlete',
+  const DB_METHODS = ['listAthletes', 'listLibrary', 'createAthlete', 'updateAthlete', 'deleteAthlete', 'getAthlete',
     'createSession', 'getSession', 'updateSession', 'deleteSession', 'rescaleSession',
     'addPitch', 'updatePitch', 'deletePitch'];
   ipcMain.handle('db', (_e, method, ...args) => {
@@ -65,7 +66,12 @@ app.whenReady().then(() => {
     if(!VIDEO_EXT.includes(path.extname(file).slice(1).toLowerCase())) return false;
     picked.add(file); return true;
   });
+  // Lets the session say a video is missing without requesting it (a 404 from media:// logs a console error).
+  ipcMain.handle('video-exists', (_e, file) => (picked.has(file) || db.hasVideo(file)) && fs.existsSync(file));
   ipcMain.handle('reveal-db', () => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
+
+  ipcMain.on('menu-state', (_e, id, checked) => { const it = Menu.getApplicationMenu()?.getMenuItemById(id); if(it) it.checked = !!checked; });
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate(a => BrowserWindow.getFocusedWindow()?.webContents.send('menu', a))));
 
   createWindow();
   app.on('activate', () => { if(BrowserWindow.getAllWindows().length === 0) createWindow(); });

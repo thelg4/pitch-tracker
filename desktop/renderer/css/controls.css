@@ -1,0 +1,47 @@
+/* Controls in the token palette. Hover and press change only the background tint. */
+button,input,select,textarea{font:inherit;color:inherit;margin:0}
+button{appearance:none;-webkit-appearance:none;border:0;background:none;padding:0;cursor:default;transition:background-color 100ms}
+a{color:var(--blue);text-decoration:none}
+:focus{outline:none}
+:focus-visible{outline:2px solid rgba(10,132,255,.6);outline-offset:1px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:var(--r-ctl);background:var(--hi);color:var(--txt);font-size:12.5px;font-weight:500;white-space:nowrap;text-decoration:none}
+.btn:hover{background:#48484a}
+.btn:active{background:#545456}
+.btn.primary{background:var(--blue);color:#fff;font-weight:600}
+.btn.primary:hover{background:#2491ff}
+.btn.primary:active{background:#0071e3}
+.btn.destructive{background:var(--red);color:#fff;font-weight:600}
+.btn.destructive:hover{background:#ff5a50}
+.btn.destructive:active{background:#e63b31}
+.btn.danger{color:var(--red)}
+.btn.sm{height:22px;padding:0 8px;font-size:12px}
+.btn:disabled,.btn:disabled:hover{opacity:.4;background:var(--hi)}
+.ib{display:grid;place-items:center;width:28px;height:24px;border-radius:var(--r-ctl);color:var(--dim);font-size:14px}
+.ib:hover{background:var(--hi)}
+.ib:active{background:#48484a}
+.ib[aria-pressed=true]{color:var(--txt)}
+.sb-row{transition:background-color 100ms}
+
+/* Segmented controls: buttons with aria-pressed, or radio labels so they work inside forms */
+.seg{display:inline-flex;gap:2px;padding:2px;border-radius:var(--r-seg);background:var(--bg);font-size:12px}
+.seg>button,.seg>label>span{display:block;padding:2px 10px;border-radius:5px;color:var(--dim);font-weight:500;transition:background-color 100ms}
+.seg>button:hover,.seg>label>span:hover{background:rgba(255,255,255,.06)}
+.seg>button[aria-pressed=true],.seg>label>input:checked+span{background:var(--hi);color:var(--txt)}
+.seg>label{display:block}
+.field>.seg{justify-self:start}
+.seg>label>input{position:absolute;opacity:0;pointer-events:none}
+.seg>label>input:focus-visible+span{outline:2px solid rgba(10,132,255,.6)}
+
+/* Fields and inputs */
+.field{display:grid;gap:4px;min-width:0}
+.lbl{font-size:10.5px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+input[type=text],input[type=number],input[type=date],input:not([type]),select,textarea{appearance:none;-webkit-appearance:none;background:var(--bg);border:.5px solid rgba(255,255,255,.14);border-radius:var(--r-ctl);padding:4px 8px;min-width:0;font-size:13px;color:var(--txt);transition:background-color 100ms}
+input::placeholder,textarea::placeholder{color:#636366}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(10,132,255,.35)}
+select{padding-right:22px;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(-45deg,transparent 50%,var(--dim) 50%);background-position:calc(100% - 11px) 52%,calc(100% - 7px) 52%;background-size:4px 4px;background-repeat:no-repeat}
+select.btn{border:0;height:22px;padding:0 22px 0 8px;background-color:var(--hi)}
+input::-webkit-calendar-picker-indicator{filter:invert(.7)}
+input[type=checkbox]{accent-color:var(--blue)}
+input[type=range]{accent-color:var(--blue)}

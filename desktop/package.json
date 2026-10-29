@@ -10,10 +10,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/scoring.test.js && ELECTRON_RUN_AS_NODE=1 electron --test test/db.test.js",
+    "test": "node --test test/scoring.test.js test/ui-logic.test.js test/menu.test.js && ELECTRON_RUN_AS_NODE=1 electron --test test/db.test.js",
     "postinstall": "electron-builder install-app-deps",
     "dist:mac": "electron-builder --mac --arm64 --x64",
-    "dist:win": "electron-builder --win --x64"
+    "dist:win": "electron-builder --win --x64",
+    "test:e2e": "node test/e2e/tagging.e2e.mjs",
+    "test:packaged": "node test/e2e/packaged.e2e.mjs"
   },
   "build": {
     "appId": "com.thelg4.bullpencommand",
@@ -22,6 +24,7 @@
       "main.js",
       "db.js",
       "preload.cjs",
+      "menu-template.js",
       "renderer/**/*",
       "package.json"
     ],
@@ -47,6 +50,7 @@
   },
   "devDependencies": {
     "electron": "^45.1.0",
-    "electron-builder": "^26.18.0"
+    "electron-builder": "^26.18.0",
+    "playwright": "^1.64.1"
   }
 }
