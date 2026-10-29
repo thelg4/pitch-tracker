@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3a3c"/>
+      <stop offset="1" stop-color="#141416"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.62" cy="0.6" r="0.45">
+      <stop offset="0" stop-color="#0a84ff" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#0a84ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ball" cx="0.38" cy="0.32" r="0.75">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#d9d9de"/>
+    </radialGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+    <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+  </g>
+  <g clip-path="url(#tile)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+  </g>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183.5" fill="none" stroke="#fff" stroke-opacity=".10" stroke-width="3"/>
+
+  <!-- strike zone -->
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <rect x="337" y="262" width="350" height="470" rx="18" stroke-opacity=".55" stroke-width="12"/>
+    <path d="M453.7 262V732M570.3 262V732M337 418.7H687M337 575.3H687" stroke-opacity=".22" stroke-width="6"/>
+  </g>
+
+  <!-- miss vector: target -> catch -->
+  <path d="M612 612L507 482" stroke="#ff9f0a" stroke-width="10" stroke-linecap="round" stroke-dasharray="2 22"/>
+
+  <!-- target -->
+  <g stroke="#0a84ff" stroke-linecap="round" fill="none">
+    <circle cx="612" cy="612" r="66" stroke-width="16"/>
+    <path d="M612 520V560M612 664V704M520 612H560M664 612H704" stroke-width="12"/>
+  </g>
+  <circle cx="612" cy="612" r="12" fill="#0a84ff"/>
+
+  <!-- ball -->
+  <g>
+    <circle cx="492" cy="464" r="50" fill="url(#ball)"/>
+    <path d="M458 428C478 446 480 482 462 502" fill="none" stroke="#ff453a" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 11"/>
+    <path d="M526 426C508 444 506 480 524 500" fill="none" stroke="#ff453a" stroke-width="6" stroke-linecap="round" stroke-dasharray="1 11"/>
+    <path d="M458 428C478 446 480 482 462 502M526 426C508 444 506 480 524 500" fill="none" stroke="#ff453a" stroke-opacity=".55" stroke-width="3"/>
+  </g>
+</svg>
