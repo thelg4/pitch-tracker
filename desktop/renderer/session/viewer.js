@@ -1,14 +1,17 @@
 // Session viewer: the geometry and drawing for the two canvases. The full frame shows the whole video with
 // the movable crop box; the catcher crop is the zoomed view where marks are placed. Both draw from one hidden
 // <video>, so they always show the same frame. All marks and the crop are stored in frame pixels.
+// A pitch's traced ball path grows as its flight plays and stays up briefly after the catch; the selected
+// pitch's whole path is always shown.
 import { clamp } from '../scoring.js';
+import { pathUpTo } from '../balltrack.js';
 import { PCOL } from '../colors.js';
 import { toast } from '../util.js';
 
 // The getters read the controller's current state, so the viewer never holds a stale copy of it.
 // `onCropSave(crop)` persists the crop after a settled change.
 export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid, getSession, getList, getDraft, getSelectedId,
-                              getDragZone, getHasVideo, getShowAll, onCropSave}){
+                              getDragZone, getHasVideo, getShowAll, getShowPaths, onCropSave}){
   let crop = getSession().crop;            // {cx, cy, w} in frame pixels; height follows the crop pane's shape
   let cropSaveT = 0;
   const fw = () => vid.videoWidth || getSession().frameW || 1920, fh = () => vid.videoHeight || getSession().frameH || 1080;
@@ -45,6 +48,7 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
     c.fillStyle = 'rgba(0,0,0,.45)'; c.beginPath(); c.rect(f.ox, f.oy, W, H); c.rect(x, y, w, h); c.fill('evenodd');
     if(getShowAll()) getList().forEach(p => { c.fillStyle = PCOL[p.type]; c.beginPath(); c.arc(f.ox + p.loc.x*f.s, f.oy + p.loc.y*f.s, 2.5, 0, 7); c.fill(); });
     c.strokeStyle = '#FFD24A'; c.lineWidth = 2; c.strokeRect(x, y, w, h);
+    c.save(); c.translate(f.ox, f.oy); c.scale(f.s, f.s); drawPaths(c, 1/f.s); c.restore();
   }
   function drawCrop(){
     const c = cvCrop.getContext('2d'), dpr = devicePixelRatio || 1, r = cssSize(cvCrop), f = cropFit(), cr = cropRect();
@@ -60,8 +64,28 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
       c.fillStyle = 'rgba(255,255,255,.75)'; c.font = `${12*lw}px ui-monospace, monospace`; c.fillText('17" plate width', z.x, z.y-6*lw);
     }
     const list = getList(), selectedId = getSelectedId(), sel = list.find(p => p.id === selectedId);
+    drawPaths(c, lw);
     if(getShowAll()) list.forEach(p => { if(p !== sel) drawPitch(c, p, lw, .35); });
     if(sel) drawPitch(c, sel, lw, 1); else drawPitch(c, getDraft(), lw, 1);
+  }
+  // Ball paths in frame coordinates; `lw` is one CSS pixel in frame pixels.
+  const HOLD_S = 0.6; // how long a path stays up after its catch while the video plays on
+  function drawPaths(c, lw){
+    if(!getShowPaths() || !getHasVideo()) return;
+    const t = vid.currentTime, selectedId = getSelectedId();
+    for(const p of getList()){
+      const pts = p.path?.pts; if(!pts?.length) continue;
+      const t0 = pts[0][0], t1 = pts[pts.length-1][0], inFlight = t >= t0 && t <= t1 + HOLD_S;
+      if(!inFlight && p.id !== selectedId) continue;
+      const shown = inFlight ? pathUpTo(pts, t) : pts;
+      if(shown.length < 2) continue;
+      const col = PCOL[p.type] || '#fff';
+      c.lineCap = c.lineJoin = 'round';
+      c.beginPath(); c.moveTo(shown[0][1], shown[0][2]); for(const [, x, y] of shown) c.lineTo(x, y);
+      c.globalAlpha = .35; c.strokeStyle = col; c.lineWidth = 9*lw; c.stroke();
+      c.globalAlpha = 1; c.lineWidth = 3*lw; c.stroke();
+      if(inFlight && t < t1){ const [, x, y] = shown[shown.length-1]; c.fillStyle = '#fff'; c.beginPath(); c.arc(x, y, 3.5*lw, 0, 7); c.fill(); } // the ball, while in flight
+    }
   }
   function drawPitch(c, p, lw, alpha){
     const col = PCOL[p.type] || '#fff', ppi = (p.zone || getSession().zone || {w:170}).w/17, ballR = 1.45*ppi;

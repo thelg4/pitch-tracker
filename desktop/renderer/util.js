@@ -16,6 +16,15 @@ export function showAllPref(v){
   }catch{ return v ?? true; }
 }
 
+// Show Ball Paths: kept the same way, default on.
+const SHOW_PATHS = 'bullpen.showPaths';
+export function showPathsPref(v){
+  try{
+    if(v !== undefined) localStorage.setItem(SHOW_PATHS, v ? '1' : '0');
+    return localStorage.getItem(SHOW_PATHS) !== '0';
+  }catch{ return v ?? true; }
+}
+
 let toastT;
 export function toast(msg){
   const t = $('#toast'); t.textContent = msg; t.hidden = false;

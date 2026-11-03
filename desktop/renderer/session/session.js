@@ -1,7 +1,7 @@
 // Session view: tag one bullpen video. The viewer (viewer.js) draws the full frame and the catcher crop,
 // the timeline (timeline.js) shows the pitches, and the inspector (inspector.js) holds the Pitch and Session
-// tabs. This controller owns the tagging state, the pointer and key handling, the title-bar tool control and
-// HUD, and the session's menu actions. The shell's slots (#tbCenter, #tbRight, #inspector) are the only
+// tabs, and the tracer (tracer.js) finds each pitch's ball path in the background. This controller owns the
+// tagging state, the pointer and key handling, the title-bar tool control and HUD, and the session's menu actions. The shell's slots (#tbCenter, #tbRight, #inspector) are the only
 // nodes queried outside `root`.
 import { PCOL } from '../colors.js';
 import { TNAME, clamp, fmt, scored } from '../scoring.js';
@@ -9,10 +9,11 @@ import { setTitle, setToolbar, setInspector, togglePanel } from '../shell.js';
 import { openSheet } from '../sheets.js';
 import { replayClass, reducedMotion, settleCount } from '../motion.js';
 import { toolState } from '../ui-logic.js';
-import { $, $$, db, esc, fmtDate, handLabel, toast, mediaUrl, basename, showAllPref } from '../util.js';
+import { $, $$, db, esc, fmtDate, handLabel, toast, mediaUrl, basename, showAllPref, showPathsPref } from '../util.js';
 import { createViewer } from './viewer.js';
 import { renderTimeline, renderList } from './timeline.js';
 import { renderPitchTab, renderSessionTab } from './inspector.js';
+import { createTracer } from './tracer.js';
 
 const TOOLS = [['zone', 'Zone', 'Z'], ['target', 'Target', 'G'], ['manual', 'Manual', 'M'], ['catch', 'Catch', '']];
 
@@ -24,7 +25,8 @@ export async function sessionView(root, id, ctx){
   const settings = () => ({hand: A.throws, view: S.cameraView, hitR: S.hitRadius});
   let list = [];
   let draft = newDraft(), mode = S.zone ? 'target' : 'zone', source = 'glove', curType = 'FB';
-  let selectedId = null, editField = null, filter = 'ALL', hasVideo = false, showAll = showAllPref(), tab = 'pitch', dead = false;
+  let selectedId = null, editField = null, filter = 'ALL', hasVideo = false, showAll = showAllPref(), showPaths = showPathsPref(), tab = 'pitch', dead = false;
+  let tracer = null;
   let dragZone = null, dragCrop = null, pan = null, raf = 0, popT = 0, pillPlaced = false, tl = null, view = 'timeline';
   function newDraft(){ return {glove:null, manual:null, loc:null}; }
   const q = sel => $(sel, root), qq = sel => $$(sel, root);
@@ -85,7 +87,7 @@ export async function sessionView(root, id, ctx){
   const vid = q('#vid'), cvFull = q('#cvFull'), cvCrop = q('#cvCrop'), stages = q('#stages');
   const viewer = createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid,
     getSession: () => S, getList: () => list, getDraft: () => ({...draft, type: curType}), getSelectedId: () => selectedId,
-    getDragZone: () => dragZone, getHasVideo: () => hasVideo, getShowAll: () => showAll,
+    getDragZone: () => dragZone, getHasVideo: () => hasVideo, getShowAll: () => showAll, getShowPaths: () => showPaths,
     onCropSave: crop => patchSession({crop})});
   const drawStages = () => viewer.draw(), setCrop = (c, persist) => viewer.setCrop(c, persist), frameCatcher = () => viewer.frameCatcher();
 
@@ -97,6 +99,22 @@ export async function sessionView(root, id, ctx){
   async function savePitch(data){
     const saved = await db('updatePitch', data.id, data); if(dead) return;
     pitches = pitches.map(p => p.id === saved.id ? saved : p); pitchesChanged();
+    if(!saved.path) tracer?.add(saved); // a re-marked catch clears the path; trace it again
+  }
+
+  /* ---------- ball paths ---------- */
+  // A fresh tracer per loaded video; it starts on every pitch that hasn't been traced yet.
+  function startTracer(){
+    tracer?.destroy();
+    tracer = createTracer({src: mediaUrl(S.videoPath), getFps: () => S.fps, onTraced: pathTraced});
+    pitches.filter(p => !p.path).forEach(p => tracer.add(p));
+  }
+  // Keep the path only if the catch it was traced to is still the pitch's catch; a re-mark queued a new trace.
+  async function pathTraced(p, path){
+    const cur = pitches.find(x => x.id === p.id);
+    if(!cur || cur.loc.t !== p.loc.t || cur.loc.x !== p.loc.x || cur.loc.y !== p.loc.y) return;
+    const saved = await db('setPitchPath', p.id, path); if(dead || !saved) return;
+    pitches = pitches.map(x => x.id === saved.id ? {...x, path: saved.path} : x); refresh();
   }
 
   /* ---------- video ---------- */
@@ -126,6 +144,7 @@ export async function sessionView(root, id, ctx){
       S = d.session; pitches = d.pitches; viewer.crop = S.crop;
     }
     hasVideo = true;
+    startTracer();
     q('#paneFull').style.aspectRatio = `${vid.videoWidth}/${vid.videoHeight}`;
     q('#scrub').max = vid.duration;
     viewer.ensureCrop();
@@ -209,7 +228,7 @@ export async function sessionView(root, id, ctx){
   async function mark(pt){
     pt.t = +vid.currentTime.toFixed(3);
     const sel = pitches.find(p => p.id === selectedId);
-    if(sel && editField){ const f = editField; editField = null; await savePitch({...sel, [f]: pt}); return; }
+    if(sel && editField){ const f = editField; editField = null; await savePitch({...sel, [f]: pt, ...(f === 'loc' && {path: null})}); return; }
     if(sel) return;
     if(!S.zone){ mode = 'zone'; toast('Draw the strike zone first so misses can be measured in inches.'); renderAll(); return; }
     if(mode === 'target'){ draft.glove = pt; mode = 'location'; }
@@ -236,7 +255,7 @@ export async function sessionView(root, id, ctx){
     }
     if(dead) return;
     pitches.push(p);
-    pitchesChanged(); popAt(p);
+    pitchesChanged(); popAt(p); tracer?.add(p);
     const m = list.find(x => x.id === p.id).m;
     toast(`#${p.n} ${p.type}: ${m.hit?'hit':'miss'} · ${fmt(m.d)}" · ${m.score} pts`);
   }
@@ -327,8 +346,10 @@ export async function sessionView(root, id, ctx){
   }
 
   /* ---------- inspector ---------- */
+  // What the Pitch tab says about a pitch's ball path.
+  const pathState = p => p.path ? (p.path.pts.length ? 'Traced' : 'Not found') : hasVideo ? 'Tracing…' : '–';
   function renderInspector(sel){
-    renderPitchTab(iq('#inspPitch'), {list, selected: sel, draft, curType, source, hasVideo,
+    renderPitchTab(iq('#inspPitch'), {list, selected: sel, draft, curType, source, hasVideo, pathState,
       onType: setType, onPreset: manualPreset, onAction: pitchAction});
     if(tab === 'session') renderSessionPane(); // a hidden Session tab skips the chart redraws; setTab renders it on show
   }
@@ -398,6 +419,7 @@ export async function sessionView(root, id, ctx){
     'undo-mark': undoMark,
     'delete-pitch': deletePitch,
     'show-all': () => { showAll = showAllPref(!showAll); window.bullpen.menuState('show-all', showAll); drawStages(); },
+    'show-paths': () => { showPaths = showPathsPref(!showPaths); window.bullpen.menuState('show-paths', showPaths); drawStages(); },
     'frame-catcher': () => frameCatcher(),
     'redraw-zone': redrawZone,
     'delete-session': deleteSession,
@@ -431,11 +453,11 @@ export async function sessionView(root, id, ctx){
 
   function cleanup(){
     dead = true;
-    document.removeEventListener('keydown', onKey); ro.disconnect(); cancelAnimationFrame(raf); clearTimeout(popT);
+    document.removeEventListener('keydown', onKey); ro.disconnect(); cancelAnimationFrame(raf); clearTimeout(popT); tracer?.destroy();
     const score = iq('#bigScore'); if(score) settleCount(score);
     const crop = viewer.flush(); if(crop && hasVideo) db('updateSession', S.id, {crop});
     vid.pause(); vid.removeAttribute('src'); vid.load();
   }
-  window.bullpen.menuState('show-all', showAll);
+  window.bullpen.menuState('show-all', showAll); window.bullpen.menuState('show-paths', showPaths);
   return {cleanup, onMenu: a => { if(!MENU[a]) return false; MENU[a](); return true; }};
 }

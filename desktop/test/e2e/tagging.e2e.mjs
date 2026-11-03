@@ -381,6 +381,15 @@ try {
   await app.close();
 }
 
+// 7 (set up here, checked in the relaunched app): a session whose one pitch the tracer should find the ball for.
+const clip = JSON.parse(execFileSync(process.execPath, [path.join(HERE, 'make-pitch-clip.mjs')]).toString());
+const traceId = +asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)});
+  const s = d.createSession({athleteId:1, videoPath:${JSON.stringify(clip.file)}, title:'pitch.mp4', fps:60, recordedOn:'2026-10-29'});
+  const zone = {x:350, y:840, w:60, h:80};
+  d.updateSession(s.id, {frameW:720, frameH:1280, zone, crop:{cx:420, cy:840, w:400}});
+  d.addPitch(s.id, {type:'FB', glove:{x:380, y:880, t:0.5}, manual:null, loc:{x:${clip.catch.x}, y:${clip.catch.y}, t:${clip.catch.t}}, zone});
+  console.log(s.id); d.close();`).trim();
+
 // 6. Reduced motion: relaunch, ask for reduced motion, tag one pitch; nothing may be animating after the catch.
 const rmId = +asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)});
   const s = d.createSession({athleteId:1, videoPath:${JSON.stringify(VIDEO)}, title:'test_hevc.mov', fps:60, recordedOn:'2026-10-28'});
@@ -414,6 +423,32 @@ try {
   await page.waitForSelector('#sN', { state: 'visible' });
   assert.equal(await page.$eval('#sN', e => e.textContent.trim()), '1');
   assert.equal(await page.evaluate(() => document.getAnimations().length), 0, 'no animations on the Session tab');
+  await menu2(app2, 'inspector-pitch');
+
+  // 7. Ball path: opening the session traces its untraced pitch in the background; the path starts at the
+  // release and ends exactly on the catch mark, and the Pitch tab says so.
+  await page.evaluate(id => { location.hash = '#/session/' + id; }, traceId);
+  await page.waitForFunction(() => document.querySelector('#drop')?.hidden && document.querySelector('#scrub').max > 1, null, { timeout: 15000 });
+  await page.waitForFunction(() => document.querySelector('#pathState')?.textContent === 'Traced', null, { timeout: 30000 });
+  const traced = JSON.parse(asNode(`import {openDb} from './db.js'; const d = openDb(${JSON.stringify(DB)});
+    console.log(JSON.stringify(d.getSession(${traceId}).pitches[0].path)); d.close();`));
+  const [first, last] = [traced.pts[0], traced.pts.at(-1)];
+  assert.ok(Math.hypot(first[1] - clip.release.x, first[2] - clip.release.y) < 15, `path starts at ${first} (release ${JSON.stringify(clip.release)})`);
+  assert.deepEqual(last.slice(1), [clip.catch.x, clip.catch.y].map(v => +v.toFixed(1)), 'path ends on the catch mark');
+  assert.ok(Math.abs(last[0] - clip.catch.t) < 1 / 60, `path ends at the catch time (${last[0]})`);
+  await page.click('#viewToggle [data-v="list"]');
+  await page.click('#log tbody tr[data-id]');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: `${OUT}/ball-path.png` });
+  // Show Ball Paths: the menu checkbox follows the renderer, and the choice is kept.
+  const showPathsItem = () => app2.evaluate(({ Menu }) => Menu.getApplicationMenu().getMenuItemById('show-paths').checked);
+  assert.equal(await showPathsItem(), true);
+  await menu2(app2, 'show-paths');
+  await page.waitForFunction(() => localStorage.getItem('bullpen.showPaths') === '0');
+  await page.waitForTimeout(100);
+  assert.equal(await showPathsItem(), false);
+  await menu2(app2, 'show-paths');
+  await page.waitForFunction(() => localStorage.getItem('bullpen.showPaths') === '1');
   assert.deepEqual(errors, []);
 } finally {
   await app2.close();

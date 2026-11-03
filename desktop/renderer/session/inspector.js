@@ -15,7 +15,7 @@ const kv = (k, v, attrs = '') => `<div class="kv"><span>${k}</span><span${attrs}
 
 /* ---------- Pitch tab ---------- */
 
-export function renderPitchTab(el, {list, selected, draft, curType, source, hasVideo, onType, onPreset, onAction}){
+export function renderPitchTab(el, {list, selected, draft, curType, source, hasVideo, pathState, onType, onPreset, onAction}){
   if(!el.firstChild){
     const pick = '<span></span>' + ZONE_COLS.map(c => `<span class="cl">${c}</span>`).join('') +
       ZONE_ROWS.map((r, ri) => `<span class="cl">${r}</span>` +
@@ -65,7 +65,7 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
     const m = p.m;
     sec.innerHTML = `<div class="lab">${selected ? `Pitch #${p.n} · ${TNAME[p.type]}` : 'Last pitch'}</div>` +
       kv('Miss', `${fmt(m.d)}"`) + kv('Arm / glove', side(m.arm, 'A', 'G')) + kv('Up / down', side(m.up, 'U', 'D')) +
-      kv('Target', p.manual ? 'Manual' : 'Glove') + kv('Score', m.score, ` style="color:var(--${tone(m.score)})"`);
+      kv('Target', p.manual ? 'Manual' : 'Glove') + kv('Ball path', pathState(p), ' id="pathState"') + kv('Score', m.score, ` style="color:var(--${tone(m.score)})"`);
   }else sec.innerHTML = '<div class="lab">Last pitch</div><div class="hint">Mark the glove, then the catch, to tag a pitch.</div>';
 
   // Edit actions for a selected pitch

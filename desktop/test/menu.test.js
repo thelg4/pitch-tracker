@@ -8,7 +8,7 @@ function collect(items, out = []){
 }
 const ACTIONS = ['new-athlete', 'new-session', 'relink-video', 'show-db', 'export-csv', 'undo-mark', 'delete-pitch',
   'toggle-sidebar', 'toggle-inspector', 'toggle-list', 'inspector-pitch', 'inspector-session',
-  'show-all', 'frame-catcher', 'redraw-zone', 'delete-session', 'welcome', 'help-score'];
+  'show-all', 'show-paths', 'frame-catcher', 'redraw-zone', 'delete-session', 'welcome', 'help-score'];
 
 test('every clickable item sends exactly its action', () => {
   const sent = [];
@@ -32,6 +32,8 @@ test('key accelerators', () => {
   assert.equal(byAction('show-all').type, 'checkbox');
   assert.equal(byAction('show-all').checked, true);
   assert.equal(byAction('show-all').id, 'show-all'); // main finds it by id to follow the renderer's state
+  assert.equal(byAction('show-paths').type, 'checkbox');
+  assert.equal(byAction('show-paths').id, 'show-paths');
 });
 
 test('no bare single-key accelerators', () => {

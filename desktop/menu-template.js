@@ -34,6 +34,7 @@ export function menuTemplate(send){
     ] },
     { label: 'Session', submenu: [
       { id: 'show-all', label: 'Show All Pitches', type: 'checkbox', checked: true, click: () => send('show-all') },
+      { id: 'show-paths', label: 'Show Ball Paths', type: 'checkbox', checked: true, click: () => send('show-paths') },
       item('Frame Catcher  C', 'frame-catcher'),
       item('Redraw Zone  Z', 'redraw-zone'),
       { type: 'separator' },
