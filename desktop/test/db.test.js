@@ -55,10 +55,27 @@ test('rescaling to a different resolution scales every stored coordinate', () =>
   const s = db.createSession({athleteId: db.createAthlete({name: 'A'}).id});
   db.rescaleSession(s.id, 1080, 1920);          // first load just records the size
   db.updateSession(s.id, {zone, crop: {cx: 500, cy: 900, w: 400}});
-  db.addPitch(s.id, pitch(200));
+  db.addPitch(s.id, pitch(200, {path: {pts: [[1.8, 300, 250], [2.1, 200, 320]]}}));
+  db.addPitch(s.id, pitch(210, {path: {pts: []}}));
   const {session, pitches} = db.rescaleSession(s.id, 2160, 3840);
   assert.equal(session.frameW, 2160); assert.equal(session.zone.w, 340); assert.equal(session.crop.cx, 1000);
   assert.equal(pitches[0].loc.x, 400); assert.equal(pitches[0].zone.x, 200); assert.equal(pitches[0].glove.t, 1.5);
+  assert.deepEqual(pitches[0].path.pts, [[1.8, 600, 500], [2.1, 400, 640]]);
+  assert.deepEqual(pitches[1].path, {pts: []});
+});
+
+test('a pitch keeps its ball path until an update replaces or clears it', () => {
+  const db = openDb(':memory:');
+  const s = db.createSession({athleteId: db.createAthlete({name: 'A'}).id});
+  const p = db.addPitch(s.id, pitch(200));
+  assert.equal(p.path, null); // not traced yet
+  const path = {pts: [[1.9, 260, 280], [2.1, 200, 320]]};
+  assert.deepEqual(db.updatePitch(p.id, {...p, path}).path, path);
+  assert.deepEqual(db.updatePitch(p.id, {...db.getSession(s.id).pitches[0], type: 'SL'}).path, path);
+  assert.equal(db.updatePitch(p.id, {...p, path: null}).path, null);
+  const set = db.setPitchPath(p.id, {pts: []});
+  assert.deepEqual(set.path, {pts: []}); assert.equal(set.type, 'FB');
+  assert.equal(db.setPitchPath(9999, path), null); // the pitch was deleted while it was being traced
 });
 
 test('deleting an athlete removes their sessions and pitches', () => {

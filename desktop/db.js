@@ -1,5 +1,5 @@
 // SQLite store: athletes → sessions (one bullpen video each) → pitches.
-// Points are stored as x/y/t columns in frame pixels; zone and crop rectangles as JSON.
+// Points are stored as x/y/t columns in frame pixels; zone and crop rectangles, and a pitch's ball path, as JSON.
 import Database from 'better-sqlite3';
 
 const MIGRATIONS = [
@@ -35,6 +35,8 @@ const MIGRATIONS = [
      zone TEXT NOT NULL,
      created_at TEXT NOT NULL DEFAULT (datetime('now')));
    CREATE INDEX pitches_session ON pitches(session_id, n);`,
+  // The ball's traced flight: {pts: [[t, x, y]…]} in frame pixels, with no points when it wasn't found.
+  `ALTER TABLE pitches ADD COLUMN path TEXT;`,
 ];
 
 const json = v => v == null ? null : JSON.stringify(v);
@@ -47,7 +49,7 @@ const sessionRow = r => r && {id: r.id, athleteId: r.athlete_id, recordedOn: r.r
   frameW: r.frame_w, frameH: r.frame_h, fps: r.fps, hitRadius: r.hit_radius, cameraView: r.camera_view,
   zone: parse(r.zone), crop: parse(r.crop), notes: r.notes, createdAt: r.created_at};
 const pitchRow = r => ({id: r.id, sessionId: r.session_id, n: r.n, type: r.type,
-  glove: pt(r,'glove'), manual: pt(r,'manual'), loc: pt(r,'loc'), zone: parse(r.zone)});
+  glove: pt(r,'glove'), manual: pt(r,'manual'), loc: pt(r,'loc'), zone: parse(r.zone), path: parse(r.path)});
 
 // Fields callers may patch, mapped to columns (and an encoder for JSON columns).
 const ATHLETE_FIELDS = {name:'name', throws:'throws', level:'level', notes:'notes'};
@@ -85,10 +87,10 @@ export function openDb(file){
     insertAthlete: db.prepare('INSERT INTO athletes(name, throws, level, notes) VALUES (@name, @throws, @level, @notes)'),
     insertSession: db.prepare(`INSERT INTO sessions(athlete_id, recorded_on, title, video_path, fps, hit_radius, camera_view)
       VALUES (@athlete_id, coalesce(@recorded_on, date('now','localtime')), @title, @video_path, @fps, @hit_radius, @camera_view)`),
-    insertPitch: db.prepare(`INSERT INTO pitches(session_id, n, type, glove_x, glove_y, glove_t, manual_x, manual_y, manual_t, loc_x, loc_y, loc_t, zone)
-      VALUES (@session_id, @n, @type, @glove_x, @glove_y, @glove_t, @manual_x, @manual_y, @manual_t, @loc_x, @loc_y, @loc_t, @zone)`),
+    insertPitch: db.prepare(`INSERT INTO pitches(session_id, n, type, glove_x, glove_y, glove_t, manual_x, manual_y, manual_t, loc_x, loc_y, loc_t, zone, path)
+      VALUES (@session_id, @n, @type, @glove_x, @glove_y, @glove_t, @manual_x, @manual_y, @manual_t, @loc_x, @loc_y, @loc_t, @zone, @path)`),
     updatePitch: db.prepare(`UPDATE pitches SET type=@type, glove_x=@glove_x, glove_y=@glove_y, glove_t=@glove_t,
-      manual_x=@manual_x, manual_y=@manual_y, manual_t=@manual_t, loc_x=@loc_x, loc_y=@loc_y, loc_t=@loc_t, zone=@zone WHERE id=@id`),
+      manual_x=@manual_x, manual_y=@manual_y, manual_t=@manual_t, loc_x=@loc_x, loc_y=@loc_y, loc_t=@loc_t, zone=@zone, path=@path WHERE id=@id`),
     hasVideo: db.prepare('SELECT 1 FROM sessions WHERE video_path = ? LIMIT 1'),
   };
   const pitchesFor = id => q.pitchesFor.all(id).map(pitchRow);
@@ -143,7 +145,8 @@ export function openDb(file){
         const k = w / s.frameW, sp = o => o && {...o, x: o.x*k, y: o.y*k}, box = b => b && {x: b.x*k, y: b.y*k, w: b.w*k, h: b.h*k};
         const crop = s.crop && {...s.crop, cx: s.crop.cx*k, cy: s.crop.cy*k, w: s.crop.w*k};
         api.updateSession(id, {zone: box(s.zone), crop});
-        for(const p of pitchesFor(id)) api.updatePitch(p.id, {...p, glove: sp(p.glove), manual: sp(p.manual), loc: sp(p.loc), zone: box(p.zone)});
+        const path = pa => pa && {...pa, pts: pa.pts.map(([t, x, y]) => [t, x*k, y*k])};
+        for(const p of pitchesFor(id)) api.updatePitch(p.id, {...p, glove: sp(p.glove), manual: sp(p.manual), loc: sp(p.loc), zone: box(p.zone), path: path(p.path)});
       }
       api.updateSession(id, {frameW: w, frameH: h});
       return api.getSession(id);
@@ -152,12 +155,17 @@ export function openDb(file){
     addPitch(sessionId, p){
       const {n} = q.nextN.get(sessionId);
       const {lastInsertRowid} = q.insertPitch.run({session_id: sessionId, n, type: p.type,
-        ...ptCols(p,'glove'), ...ptCols(p,'manual'), ...ptCols(p,'loc'), zone: json(p.zone)});
+        ...ptCols(p,'glove'), ...ptCols(p,'manual'), ...ptCols(p,'loc'), zone: json(p.zone), path: json(p.path)});
       return pitchRow(q.pitch.get(lastInsertRowid));
     },
     updatePitch(id, p){
-      q.updatePitch.run({id, type: p.type, ...ptCols(p,'glove'), ...ptCols(p,'manual'), ...ptCols(p,'loc'), zone: json(p.zone)});
+      q.updatePitch.run({id, type: p.type, ...ptCols(p,'glove'), ...ptCols(p,'manual'), ...ptCols(p,'loc'), zone: json(p.zone), path: json(p.path)});
       return pitchRow(q.pitch.get(id));
+    },
+    // Set only the ball path, so a trace finishing in the background never overwrites an edit made meanwhile.
+    setPitchPath(id, path){
+      db.prepare('UPDATE pitches SET path = ? WHERE id = ?').run(json(path), id);
+      const r = q.pitch.get(id); return r ? pitchRow(r) : null;
     },
     // Delete and renumber the rest so pitch numbers stay 1..n.
     deletePitch: db.transaction(id => {

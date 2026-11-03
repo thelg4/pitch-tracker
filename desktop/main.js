@@ -54,7 +54,7 @@ app.whenReady().then(() => {
   // Renderer calls go through one channel; only these db methods are reachable.
   const DB_METHODS = ['listAthletes', 'listLibrary', 'createAthlete', 'updateAthlete', 'deleteAthlete', 'getAthlete',
     'createSession', 'getSession', 'updateSession', 'deleteSession', 'rescaleSession',
-    'addPitch', 'updatePitch', 'deletePitch'];
+    'addPitch', 'updatePitch', 'setPitchPath', 'deletePitch'];
   ipcMain.handle('db', (_e, method, ...args) => {
     if(!DB_METHODS.includes(method)) throw new Error(`Unknown method: ${method}`);
     return db[method](...args);
