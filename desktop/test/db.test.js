@@ -78,6 +78,21 @@ test('a pitch keeps its ball path until an update replaces or clears it', () => 
   assert.equal(db.setPitchPath(9999, path), null); // the pitch was deleted while it was being traced
 });
 
+test('a model-proposed target round-trips, updates and scales with the session', () => {
+  const db = openDb(':memory:');
+  const s = db.createSession({athleteId: db.createAthlete({name: 'A'}).id});
+  db.rescaleSession(s.id, 1080, 1920);
+  const hand = db.addPitch(s.id, pitch(200));
+  assert.equal(hand.auto, null); // a hand-placed target has no proposal
+  const auto = {x: 205, y: 290, score: 0.71, state: 'proposed'};
+  const p = db.addPitch(s.id, pitch(210, {auto}));
+  assert.deepEqual(p.auto, auto);
+  assert.deepEqual(db.updatePitch(p.id, {...p, auto: {...auto, state: 'confirmed'}}).auto.state, 'confirmed');
+  const {pitches} = db.rescaleSession(s.id, 2160, 3840);
+  assert.deepEqual(pitches[1].auto, {x: 410, y: 580, score: 0.71, state: 'confirmed'});
+  assert.equal(pitches[0].auto, null);
+});
+
 test('deleting an athlete removes their sessions and pitches', () => {
   const db = openDb(':memory:');
   const a = db.createAthlete({name: 'A'}), s = db.createSession({athleteId: a.id});
