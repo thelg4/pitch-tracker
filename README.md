@@ -41,6 +41,18 @@ It has two parts: a browser app for tagging and scoring, and a Python/OpenCV pip
 | `catcher.py` | Debug output for the blue-gear blobs. |
 | `probe.swift` | Prints codec, fps, size and rotation via AVFoundation. |
 | `frames.swift`, `crop.swift` | Frame grabs via AVFoundation. |
+| `export_detector.py` | Exports a trained RF-DETR checkpoint to the ONNX model the desktop app runs (see below). |
+
+## The mitt detector (desktop Auto mode)
+
+The desktop app's **Auto** tool (key A) needs only a click on the catch. A trained detector finds the catcher's mitt in the frames just before the catch and proposes it as the target (the glove at release). Each proposal is marked for review: select the pitch, check the dashed cyan ring, then press Return to confirm it or click **Move Glove**. The CSV records which targets came from the model and whether they were confirmed or moved.
+
+The model is not in git. To install or update it:
+```bash
+pip install rfdetr onnx onnxruntime
+python tools/export_detector.py path/to/weights.pt --check some_catcher_crop.png
+```
+This writes `desktop/models/mitt.onnx` and `mitt.json`. The app loads the model from there and `npm run dist:mac` bundles it. Without the model, Auto is greyed out and everything else works as before.
 
 ## Clip-specific values (IMG_5997)
 Several values were set by reviewing this clip by eye. Re-check them for a new video:

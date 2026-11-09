@@ -91,8 +91,9 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
     const col = PCOL[p.type] || '#fff', ppi = (p.zone || getSession().zone || {w:170}).w/17, ballR = 1.45*ppi;
     c.globalAlpha = alpha;
     const t = p.manual || p.glove;
-    if(p.glove){ // catcher's glove: ring
-      c.strokeStyle = p.manual ? 'rgba(255,255,255,.7)' : '#fff'; c.lineWidth = 2.5*lw; c.setLineDash(p.manual ? [4*lw,3*lw] : []);
+    if(p.glove){ // catcher's glove: ring (cyan and dashed while it is the model's unreviewed proposal)
+      const proposed = p.auto?.state === 'proposed';
+      c.strokeStyle = proposed ? '#64D2FF' : p.manual ? 'rgba(255,255,255,.7)' : '#fff'; c.lineWidth = 2.5*lw; c.setLineDash(p.manual || proposed ? [4*lw,3*lw] : []);
       c.beginPath(); c.arc(p.glove.x, p.glove.y, ballR*2.2, 0, 7); c.stroke(); c.setLineDash([]);
     }
     if(p.manual){ // manual target: crosshair

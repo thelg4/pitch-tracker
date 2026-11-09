@@ -53,6 +53,13 @@ test('manual mode activates the manual tool', () => {
   assert.equal(s.hud, HUD.manual);
 });
 
+test('auto mode activates the auto tool and says when the model is still looking', () => {
+  const st = {mode: 'auto', hasZone: true, hasVideo: true, draft: noDraft, selected: null, editField: null};
+  assert.deepStrictEqual(toolState(st), {active: 'auto', catchEnabled: false, hud: HUD.auto});
+  assert.equal(toolState({...st, finding: 2}).hud, HUD.finding);
+  assert.equal(toolState({...st, hasZone: false}).active, 'zone');
+});
+
 test('editing the location of a selected pitch activates catch with an editing HUD', () => {
   const s = toolState({mode: 'location', hasZone: true, hasVideo: true, draft: noDraft, selected: {n: 4}, editField: 'loc'});
   assert.equal(s.active, 'catch');

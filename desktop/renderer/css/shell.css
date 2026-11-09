@@ -118,6 +118,7 @@ body[data-platform=darwin] #titlebar{padding-left:78px}
 .pill.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
 .pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
 .pill.neutral{background:var(--sunk);color:var(--muted);border:1px solid var(--line)}
+.pill.model{background:color-mix(in srgb,#64d2ff 18%,transparent);color:#64d2ff}
 .insights{margin:0;padding:0;list-style:none;display:grid;gap:8px}
 .insights li{display:grid;grid-template-columns:8px 1fr;gap:10px;align-items:start}
 .insights li::before{content:"";width:8px;height:8px;border-radius:2px;margin-top:6px;background:var(--muted)}

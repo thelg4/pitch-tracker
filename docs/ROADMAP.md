@@ -14,6 +14,8 @@ We film a bullpen session from behind the pitcher. The camera is offset a little
 | `app/bullpen-command.html` | A single-page tracker. You tap the target and the catch, and it scores misses, draws trends and exports CSV. | Fully manual. Scale comes from the plate width (wrong depth, see [Calibration](#calibration)). Data lives in one browser's storage. |
 | `pipeline/` | A hand-tuned OpenCV pipeline: it finds the pitches, tracks the ball, finds the catcher by his blue gear and renders a review video. | The crop, the rejected tracks and the glove ids were tuned by eye for one clip (IMG_5997), so it doesn't work on new videos. About 2 px per inch. The ball gets lost against the catcher's uniform. |
 
+| `desktop/` Auto tool | Detector v1 (RF-DETR Small, one class: `mitt`) runs in the app through ONNX Runtime. You click the catch, the model proposes the glove at release, and you confirm or move it. The ball path is traced without a model. | Mitt only, so the catch is still a click. Release is assumed to fall 0.4–0.75 s before the catch rather than detected. v1 confidence is low (about 0.3–0.7). |
+
 The pipeline proved the concept and showed us what's hard. The plan below replaces its hand-tuned parts with a trained detector and a proper desktop app.
 
 ## Key design decisions

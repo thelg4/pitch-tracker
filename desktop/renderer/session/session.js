@@ -1,6 +1,7 @@
 // Session view: tag one bullpen video. The viewer (viewer.js) draws the full frame and the catcher crop,
 // the timeline (timeline.js) shows the pitches, and the inspector (inspector.js) holds the Pitch and Session
-// tabs, and the tracer (tracer.js) finds each pitch's ball path in the background. This controller owns the
+// tabs, and the tracer (tracer.js) finds each pitch's ball path in the background and, in Auto, asks the mitt
+// detector for each catch's target (the user reviews those: Confirm, or Re-mark Glove). This controller owns the
 // tagging state, the pointer and key handling, the title-bar tool control and HUD, and the session's menu actions. The shell's slots (#tbCenter, #tbRight, #inspector) are the only
 // nodes queried outside `root`.
 import { PCOL } from '../colors.js';
@@ -9,13 +10,13 @@ import { setTitle, setToolbar, setInspector, togglePanel } from '../shell.js';
 import { openSheet } from '../sheets.js';
 import { replayClass, reducedMotion, settleCount } from '../motion.js';
 import { toolState } from '../ui-logic.js';
-import { $, $$, db, esc, fmtDate, handLabel, toast, mediaUrl, basename, showAllPref, showPathsPref } from '../util.js';
+import { $, $$, db, esc, fmtDate, handLabel, toast, mediaUrl, basename, showAllPref, showPathsPref, autoPref } from '../util.js';
 import { createViewer } from './viewer.js';
 import { renderTimeline, renderList } from './timeline.js';
 import { renderPitchTab, renderSessionTab } from './inspector.js';
 import { createTracer } from './tracer.js';
 
-const TOOLS = [['zone', 'Zone', 'Z'], ['target', 'Target', 'G'], ['manual', 'Manual', 'M'], ['catch', 'Catch', '']];
+const TOOLS = [['zone', 'Zone', 'Z'], ['auto', 'Auto', 'A'], ['target', 'Target', 'G'], ['manual', 'Manual', 'M'], ['catch', 'Catch', '']];
 
 export async function sessionView(root, id, ctx){
   const data = await db('getSession', id);
@@ -27,8 +28,12 @@ export async function sessionView(root, id, ctx){
   let draft = newDraft(), mode = S.zone ? 'target' : 'zone', source = 'glove', curType = 'FB';
   let selectedId = null, editField = null, filter = 'ALL', hasVideo = false, showAll = showAllPref(), showPaths = showPathsPref(), tab = 'pitch', dead = false;
   let tracer = null;
+  // Auto: each click is a catch and the mitt detector proposes the target. `finding` counts catches waiting on it.
+  let detector = {available: false}, autoOn = false, finding = 0;
   let dragZone = null, dragCrop = null, pan = null, raf = 0, popT = 0, pillPlaced = false, tl = null, view = 'timeline';
   function newDraft(){ return {glove:null, manual:null, loc:null}; }
+  // The mode a new pitch starts in.
+  const startMode = () => autoOn ? 'auto' : source === 'manual' ? 'manual' : 'target';
   const q = sel => $(sel, root), qq = sel => $$(sel, root);
 
   root.classList.add('session');
@@ -217,7 +222,7 @@ export async function sessionView(root, id, ctx){
     if(pan){ pan = null; setCrop(viewer.crop); return; }
     if(dragZone){
       const {x, y, w, h} = dragZone; dragZone = null;
-      if(w > 12){ S.zone = {x, y, w, h}; await patchSession({zone: S.zone}); if(dead) return; mode = source === 'manual' ? 'manual' : 'target';
+      if(w > 12){ S.zone = {x, y, w, h}; await patchSession({zone: S.zone}); if(dead) return; mode = startMode();
         toast(`Zone set · ${fmt(w/17)} px per inch`); frameCatcher(); }
       renderAll(); return;
     }
@@ -228,10 +233,16 @@ export async function sessionView(root, id, ctx){
   async function mark(pt){
     pt.t = +vid.currentTime.toFixed(3);
     const sel = pitches.find(p => p.id === selectedId);
-    if(sel && editField){ const f = editField; editField = null; await savePitch({...sel, [f]: pt, ...(f === 'loc' && {path: null})}); return; }
+    if(sel && editField){
+      const f = editField; editField = null;
+      // A re-marked catch needs a new path; a re-marked glove means the model's proposal was moved by hand.
+      await savePitch({...sel, [f]: pt, ...(f === 'loc' && {path: null}), ...(f === 'glove' && sel.auto && {auto: {...sel.auto, state: 'nudged'}})});
+      return;
+    }
     if(sel) return;
     if(!S.zone){ mode = 'zone'; toast('Draw the strike zone first so misses can be measured in inches.'); renderAll(); return; }
-    if(mode === 'target'){ draft.glove = pt; mode = 'location'; }
+    if(mode === 'auto'){ await commitAuto(pt); return; }
+    if(mode === 'target'){ draft.glove = pt; if(draft.loc){ await commit(); return; } mode = 'location'; } // a catch the model found no glove for
     else if(mode === 'manual'){ draft.manual = pt; mode = 'location'; }
     else if(mode === 'location'){ draft.loc = pt; await commit(); return; }
     renderAll();
@@ -241,7 +252,7 @@ export async function sessionView(root, id, ctx){
   // back waiting for the catch, unless a new mark was started meanwhile.
   async function commit(){
     const d = {type: curType, glove: draft.glove, manual: draft.manual, loc: draft.loc, zone: {...S.zone}};
-    const n = pitches.length + 1, next = newDraft(), nextMode = source === 'manual' ? 'manual' : 'target';
+    const n = pitches.length + 1, next = newDraft(), nextMode = startMode();
     draft = next; mode = nextMode;
     let p;
     try{ p = await db('addPitch', S.id, d); }
@@ -254,10 +265,40 @@ export async function sessionView(root, id, ctx){
       return;
     }
     if(dead) return;
+    added(p);
+  }
+  function added(p){
     pitches.push(p);
     pitchesChanged(); popAt(p); tracer?.add(p);
     const m = list.find(x => x.id === p.id).m;
-    toast(`#${p.n} ${p.type}: ${m.hit?'hit':'miss'} · ${fmt(m.d)}" · ${m.score} pts`);
+    toast(`#${p.n} ${p.type}: ${m.hit?'hit':'miss'} · ${fmt(m.d)}" · ${m.score} pts${p.auto ? ` · glove found (${Math.round(p.auto.score*100)}%)` : ''}`);
+  }
+  // Auto: the click is the catch and the model proposes the glove at release. The pitch is saved once its target
+  // is found, so quick clicks simply queue. If no mitt is found, the catch waits for the user to click the glove.
+  async function commitAuto(loc){
+    const type = curType, zone = {...S.zone};
+    finding++; renderAll();
+    const t = await (tracer ? tracer.findTarget(loc, zone, detector.input) : null);
+    finding--; if(dead) return;
+    if(!t){
+      if(!selectedId && mode === 'auto' && !draft.loc){
+        draft = {glove: null, manual: null, loc}; mode = 'target';
+        toast("Couldn't find the glove. Click it at release.");
+      }else toast("Couldn't find the glove for that catch. Mark it with Target.");
+      renderAll(); return;
+    }
+    const auto = {x: t.x, y: t.y, score: +t.score.toFixed(3), state: 'proposed'};
+    let p;
+    try{ p = await db('addPitch', S.id, {type, glove: {x: t.x, y: t.y, t: t.t}, manual: null, loc, zone, auto}); }
+    catch{ if(!dead){ toast("Couldn't save that pitch. Click the catch again."); renderAll(); } return; }
+    if(dead) return;
+    added(p);
+  }
+  function setAuto(){
+    if(!detector.available){ toast('Auto needs the mitt model. See the README to install it.'); return; }
+    autoOn = autoPref(true);
+    if(!selectedId && hasVideo && S.zone){ draft = newDraft(); mode = 'auto'; }
+    renderAll();
   }
   // The ball marker is drawn on the canvas, which can't animate one mark, so a DOM disc pops over it.
   function popAt(p){
@@ -268,23 +309,23 @@ export async function sessionView(root, id, ctx){
     clearTimeout(popT); popT = setTimeout(() => { el.hidden = true; el.classList.remove('go'); }, 520);
   }
   function setSource(v){
-    source = v;
+    source = v; autoOn = autoPref(false);
     if(!selectedId && hasVideo && S.zone) mode = v === 'manual' ? (draft.manual ? 'location' : 'manual') : (draft.glove || draft.manual ? 'location' : 'target');
     if(selectedId && v === 'manual') editField = 'manual';
     renderAll();
   }
   function undoMark(){
     if(selectedId){ selectedId = null; editField = null; renderAll(); return; }
-    if(draft.loc) draft.loc = null;
+    if(draft.loc){ draft.loc = null; if(!draft.glove && !draft.manual) mode = startMode(); } // a catch still waiting for its glove
     else if(mode === 'location' && draft.manual && source === 'manual'){ draft.manual = null; mode = 'manual'; }
-    else if(mode === 'location' && draft.glove){ draft.glove = null; draft.manual = null; mode = source === 'manual' ? 'manual' : 'target'; }
+    else if(mode === 'location' && draft.glove){ draft.glove = null; draft.manual = null; mode = startMode(); }
     else if(mode === 'manual' && draft.glove){ draft.glove = null; }
     renderAll();
   }
   function manualPreset(armCol, row){
     const z = (pitches.find(p => p.id === selectedId) || {}).zone || S.zone; if(!z){ toast('Draw the strike zone first.'); return; }
     const a = (A.throws === 'R' ? 1 : -1) * (S.cameraView === 'pitcher' ? 1 : -1), col = a > 0 ? armCol : 2 - armCol;
-    if(selectedId) editField = 'manual'; else if(mode !== 'manual'){ source = 'manual'; mode = 'manual'; }
+    if(selectedId) editField = 'manual'; else if(mode !== 'manual'){ source = 'manual'; autoOn = autoPref(false); mode = 'manual'; }
     mark({x: z.x + z.w*(col + .5)/3, y: z.y + z.h*(row + .5)/3});
   }
 
@@ -295,8 +336,8 @@ export async function sessionView(root, id, ctx){
     else { curType = t; renderAll(); }
   }
   function redrawZone(){ if(!hasVideo){ toast('Load the video to draw a zone.'); return; } selectedId = null; editField = null; mode = 'zone'; renderAll(); }
-  // Zone, Target and Manual act like Z, G and M. Catch is reached by placing a target, so clicking it does nothing.
-  const TOOL_ACTION = {zone: redrawZone, target: () => setSource('glove'), manual: () => setSource('manual')};
+  // Zone, Auto, Target and Manual act like Z, A, G and M. Catch is reached by placing a target, so clicking it does nothing.
+  const TOOL_ACTION = {zone: redrawZone, auto: setAuto, target: () => setSource('glove'), manual: () => setSource('manual')};
   tools.onclick = e => { const b = e.target.closest('[data-tool]'); if(b && !b.disabled) TOOL_ACTION[b.dataset.tool]?.(); };
 
   async function pitchAction(a){
@@ -304,11 +345,21 @@ export async function sessionView(root, id, ctx){
     if(a === 'jumpT'){ if(hasVideo) seekTo((p.manual || p.glove).t); return; }
     if(a === 'jumpL'){ if(hasVideo) seekTo(p.loc.t); return; }
     if(a === 'clearM'){ await savePitch({...p, manual: null}); return; }
+    if(a === 'confirmT'){ confirmTarget(); return; }
     if(a === 'del'){ deletePitch(); return; }
     if(a === 'glove' || a === 'loc') editField = a;
     else if(a === 'manual'){ editField = 'manual'; source = 'manual'; }
     else if(a === 'done'){ selectedId = null; editField = null; }
     renderAll();
+  }
+  // Accept the model's target for the selected pitch and move on to the next one still to review.
+  async function confirmTarget(){
+    const p = pitches.find(x => x.id === selectedId);
+    if(p?.auto?.state !== 'proposed') return;
+    await savePitch({...p, auto: {...p.auto, state: 'confirmed'}}); if(dead) return;
+    const next = pitches.find(x => x.auto?.state === 'proposed' && x.n > p.n) || pitches.find(x => x.auto?.state === 'proposed');
+    selectedId = null; editField = null;
+    if(next) selectPitch(next.id); else { toast('All model targets reviewed'); renderAll(); }
   }
   async function deletePitch(){
     const p = list.find(x => x.id === selectedId);
@@ -335,6 +386,7 @@ export async function sessionView(root, id, ctx){
       const t = b.dataset.tool, pressed = t === active;
       b.setAttribute('aria-pressed', pressed); if(pressed) on = b;
       if(t === 'catch') b.disabled = !catchEnabled;
+      if(t === 'auto'){ b.disabled = !detector.available; b.title = detector.available ? 'Auto (A): click the catch and the model finds the glove' : 'Auto needs the mitt model (desktop/models/mitt.onnx)'; }
     });
     const pill = tools.querySelector('.tool-pill');
     pill.classList.toggle('off', !on);
@@ -368,11 +420,12 @@ export async function sessionView(root, id, ctx){
     qq('#viewToggle [data-v]').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === v));
   }
   q('#viewToggle').onclick = e => { const b = e.target.closest('[data-v]'); if(b) setView(b.dataset.v); };
-  // Clicking a clip or a row selects that pitch (clicking it again deselects) and seeks to its catch frame.
+  // Clicking a clip or a row selects that pitch (clicking it again deselects) and seeks to its catch frame, or to
+  // its target frame while the model's target is waiting for review, so the proposal is seen on the mitt.
   function selectPitch(pid){
     selectedId = selectedId === pid ? null : pid; editField = null;
     const p = pitches.find(x => x.id === selectedId);
-    if(p){ source = p.manual ? 'manual' : 'glove'; if(hasVideo) seekTo(p.loc.t); }
+    if(p){ source = p.manual ? 'manual' : 'glove'; if(hasVideo) seekTo(p.auto?.state === 'proposed' ? p.glove.t : p.loc.t); }
     renderAll();
   }
   function renderTL(){
@@ -386,8 +439,9 @@ export async function sessionView(root, id, ctx){
   /* ---------- session actions (menu and title bar) ---------- */
   function csv(){
     const q = s => '"' + String(s).replace(/"/g, '""') + '"';
-    const head = 'athlete,date,pitch,type,target_source,miss_in,arm_side_in,up_in,direction,in_zone,hit,score,setup_offset_in,catch_time_s';
-    return [head, ...list.map(p => { const m = p.m; return [q(A.name), S.recordedOn, p.n, p.type, p.manual?'manual':'glove', fmt(m.d,2), fmt(m.arm,2), fmt(m.up,2), m.dir, m.inZone, m.hit, m.score, m.setupOff==null?'':fmt(m.setupOff,2), p.loc.t].join(','); })].join('\n');
+    const head = 'athlete,date,pitch,type,target_source,miss_in,arm_side_in,up_in,direction,in_zone,hit,score,setup_offset_in,catch_time_s,glove_by_model,model_score';
+    return [head, ...list.map(p => { const m = p.m; return [q(A.name), S.recordedOn, p.n, p.type, p.manual?'manual':'glove', fmt(m.d,2), fmt(m.arm,2), fmt(m.up,2), m.dir, m.inZone, m.hit, m.score, m.setupOff==null?'':fmt(m.setupOff,2), p.loc.t,
+      p.auto?.state ?? '', p.auto ? p.auto.score : ''].join(','); })].join('\n');
   }
   // Copy to the clipboard; if that fails, show the CSV selected in a sheet so ⌘C copies it.
   async function exportCsv(){
@@ -434,6 +488,8 @@ export async function sessionView(root, id, ctx){
     else if(k === 'arrowright'){ e.preventDefault(); step(e.shiftKey ? 10 : 1); }
     else if(k === 'g') setSource('glove');
     else if(k === 'm') setSource('manual');
+    else if(k === 'a') setAuto();
+    else if(k === 'enter' && selectedId && !e.target.closest('button')){ e.preventDefault(); confirmTarget(); }
     else if(k === 'z') redrawZone();
     else if(k === 'c') frameCatcher();
     else if(k === 'backspace'){ e.preventDefault(); undoMark(); }
@@ -443,11 +499,18 @@ export async function sessionView(root, id, ctx){
 
   function renderAll(){
     const sel = list.find(p => p.id === selectedId) || null;
-    const ts = toolState({mode, hasZone: !!S.zone, hasVideo, draft, selected: sel ? {n: sel.n} : null, editField});
+    const ts = toolState({mode, hasZone: !!S.zone, hasVideo, draft, selected: sel ? {n: sel.n} : null, editField, finding});
     q('#hud').textContent = ts.hud; renderTools(ts);
     renderInspector(sel); renderTL(); drawStages();
   }
   vid.addEventListener('timeupdate', syncTime);
+  // Whether the mitt model is installed decides if Auto is offered; Auto stays on across sessions once chosen.
+  window.bullpen.detectorInfo().then(info => {
+    if(dead) return;
+    detector = info; autoOn = info.available && autoPref();
+    if(autoOn && mode === 'target' && !draft.glove && !draft.loc && !selectedId) mode = 'auto';
+    renderAll();
+  }).catch(e => console.warn('Detector unavailable', e));
   setView(view);
   loadVideo(); refresh();
 

@@ -60,6 +60,7 @@
 .clip.marker.in{animation-name:clipInM}
 .clip:hover,.clip.sel{z-index:3}
 .clip.sel{box-shadow:0 0 0 1.5px #fff}
+.clip.review{outline:1.5px dashed #64d2ff;outline-offset:1px} /* the model placed its glove; not reviewed yet */
 .clip.in{animation:clipIn 550ms var(--spring)}
 @keyframes clipIn{0%{transform:translateY(16px) scale(.6);opacity:0}100%{transform:none;opacity:1}}
 .ph{position:absolute;z-index:4;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--red);pointer-events:none}

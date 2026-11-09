@@ -2,10 +2,11 @@
 // No DOM access, so the renderer and the tests share one implementation.
 
 export const AVATAR_COLORS = ['#0a84ff','#ff9f0a','#30d158','#bf5af2','#ff375f','#64d2ff','#ffd60a','#5e5ce6'];
-export const HUD = {zone:'Drag a box over the strike zone', target:'Click the glove at release', manual:'Click the intended target', catch:'Click where the ball is caught', noVideo:'Load the bullpen video'};
+export const HUD = {zone:'Drag a box over the strike zone', target:'Click the glove at release', manual:'Click the intended target', catch:'Click where the ball is caught',
+  auto:'Click where the ball is caught · the model finds the glove', finding:'Finding the glove…', noVideo:'Load the bullpen video'};
 export const MIN_CLIP = 0.012;
 
-const TOOL_FOR_MODE = {zone:'zone', target:'target', manual:'manual', location:'catch'};
+const TOOL_FOR_MODE = {zone:'zone', target:'target', manual:'manual', location:'catch', auto:'auto'};
 const TOOL_FOR_FIELD = {glove:'target', manual:'manual', loc:'catch'};
 
 export function initials(name){
@@ -21,12 +22,13 @@ export function avatarColor(name){
 
 // Which toolbar tool is active and what the HUD says. Video, then editing, then zone, then mode decide.
 // Catch is enabled once a target is placed, or while a selected pitch's location is being re-marked.
-export function toolState({mode, hasZone, hasVideo, selected, editField}){
+// In auto mode each click is a catch; `finding` counts the catches still waiting on the model.
+export function toolState({mode, hasZone, hasVideo, selected, editField, finding = 0}){
   const catchEnabled = mode === 'location' || editField === 'loc';
   if(!hasVideo) return {active:null, catchEnabled, hud:HUD.noVideo};
   if(selected) return {active: TOOL_FOR_FIELD[editField] ?? null, catchEnabled, hud:`Editing #${selected.n}`};
   const tool = hasZone ? TOOL_FOR_MODE[mode] : 'zone';
-  return {active: tool, catchEnabled, hud: HUD[tool]};
+  return {active: tool, catchEnabled, hud: tool === 'auto' && finding ? HUD.finding : HUD[tool]};
 }
 
 // Timeline clip for a pitch as fractions of the video. A pitch with no glove release, or one whose

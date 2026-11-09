@@ -25,6 +25,15 @@ export function showPathsPref(v){
   }catch{ return v ?? true; }
 }
 
+// Auto (the model finds the glove): kept the same way, default off until the user picks it.
+const AUTO = 'bullpen.auto';
+export function autoPref(v){
+  try{
+    if(v !== undefined) localStorage.setItem(AUTO, v ? '1' : '0');
+    return localStorage.getItem(AUTO) === '1';
+  }catch{ return v ?? false; }
+}
+
 let toastT;
 export function toast(msg){
   const t = $('#toast'); t.textContent = msg; t.hidden = false;

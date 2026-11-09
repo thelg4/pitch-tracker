@@ -12,6 +12,9 @@ const TREND_SIZE = {w: 250, h: 150};   // the rolling trend's viewBox in the nar
 const $ = (el, sel) => el.querySelector(sel);
 const side = (v, pos, neg) => `${v >= 0 ? pos : neg} ${fmt(Math.abs(v))}"`;
 const kv = (k, v, attrs = '') => `<div class="kv"><span>${k}</span><span${attrs}>${v}</span></div>`;
+// Where a pitch's target came from: a manual pick, a clicked glove, or the mitt detector (and whether it was reviewed).
+const targetLabel = p => p.manual ? 'Manual' : !p.auto ? 'Glove'
+  : p.auto.state === 'proposed' ? `Model · ${Math.round(p.auto.score*100)}% · review` : p.auto.state === 'confirmed' ? 'Model · confirmed' : 'Glove · model moved';
 
 /* ---------- Pitch tab ---------- */
 
@@ -51,8 +54,9 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
   $(el, '#typeLab').textContent = `Pitch #${selected ? selected.n : list.length + 1} type`;
   el.querySelectorAll('#types [data-t]').forEach(b => b.setAttribute('aria-pressed', b.dataset.t === typeNow));
   $(el, '#types').onclick = e => { const b = e.target.closest('[data-t]'); if(b) onType(b.dataset.t); };
-  const placed = !selected && (draft.glove || draft.manual);
-  $(el, '#draftHint').textContent = placed ? `${draft.manual ? 'Manual target' : 'Glove'} marked. Click where the ball is caught.` : '';
+  const placed = !selected && (draft.glove || draft.manual || draft.loc);
+  $(el, '#draftHint').textContent = !placed ? '' : draft.glove || draft.manual ? `${draft.manual ? 'Manual target' : 'Glove'} marked. Click where the ball is caught.`
+    : 'Catch marked. The model found no glove: click it at release.';
   $(el, '#draftHint').hidden = !placed;
 
   // Zone-third picker, only while Manual is the target type
@@ -65,7 +69,7 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
     const m = p.m;
     sec.innerHTML = `<div class="lab">${selected ? `Pitch #${p.n} · ${TNAME[p.type]}` : 'Last pitch'}</div>` +
       kv('Miss', `${fmt(m.d)}"`) + kv('Arm / glove', side(m.arm, 'A', 'G')) + kv('Up / down', side(m.up, 'U', 'D')) +
-      kv('Target', p.manual ? 'Manual' : 'Glove') + kv('Ball path', pathState(p), ' id="pathState"') + kv('Score', m.score, ` style="color:var(--${tone(m.score)})"`);
+      kv('Target', targetLabel(p)) + kv('Ball path', pathState(p), ' id="pathState"') + kv('Score', m.score, ` style="color:var(--${tone(m.score)})"`);
   }else sec.innerHTML = '<div class="lab">Last pitch</div><div class="hint">Mark the glove, then the catch, to tag a pitch.</div>';
 
   // Edit actions for a selected pitch
@@ -73,10 +77,12 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
   if(selected){
     const dis = hasVideo ? '' : ' disabled';
     edit.innerHTML = `<div class="lab">Edit</div>
+      ${selected.auto?.state === 'proposed' ? `<div class="iacts two"><button type="button" class="btn sm primary" data-a="confirmT" title="Confirm and review the next (Return)">Confirm Target ↩</button><button type="button" class="btn sm" data-a="glove"${dis}>Move Glove</button></div>
+      <div class="hint">The model placed the glove at release. Confirm it, or move it by clicking the glove.</div>` : ''}
       <div class="iacts">
         <button type="button" class="btn sm" data-a="jumpT"${dis}>Go to Target Frame</button>
         <button type="button" class="btn sm" data-a="jumpL"${dis}>Go to Catch Frame</button>
-        <button type="button" class="btn sm" data-a="glove"${dis}>Re-mark Glove</button>
+        ${selected.auto?.state === 'proposed' ? '' : `<button type="button" class="btn sm" data-a="glove"${dis}>Re-mark Glove</button>`}
         <button type="button" class="btn sm" data-a="manual">${selected.manual ? 'Re-mark Manual' : 'Set Manual Target'}</button>
         <button type="button" class="btn sm" data-a="loc"${dis}>Re-mark Location</button>
         ${selected.manual && selected.glove ? '<button type="button" class="btn sm" data-a="clearM">Use Glove Instead</button>' : ''}

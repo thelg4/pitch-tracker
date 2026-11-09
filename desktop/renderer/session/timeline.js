@@ -18,7 +18,8 @@ export function renderTimeline(el, list, duration, {selectedId, onSelect, onScru
       const fresh = prev !== undefined && p.id > prev;
       // A marker is centered on the catch by its CSS (fixed width, translateX(-50%), clamped inside the lane).
       const pos = c.marker ? `left:clamp(12px,${(p.loc.t / duration) * 100}%,calc(100% - 12px));` : `left:${c.left * 100}%;width:${c.width * 100}%;`;
-      return `<div class="clip${fresh ? ' in' : ''}${p.id === selectedId ? ' sel' : ''}${c.marker ? ' marker' : ''}" data-id="${p.id}" role="button" tabindex="-1" title="#${p.n} ${p.type} · ${p.m.score}"
+      const review = p.auto?.state === 'proposed';
+      return `<div class="clip${fresh ? ' in' : ''}${p.id === selectedId ? ' sel' : ''}${c.marker ? ' marker' : ''}${review ? ' review' : ''}" data-id="${p.id}" role="button" tabindex="-1" title="#${p.n} ${p.type} · ${p.m.score}${review ? ' · model target to review' : ''}"
         style="${pos}background:${col};color:${pitchInk(p.type)}">#${p.n}<small>${p.m.score}</small></div>`;
     }).join('');
     maxRendered.set(el, Math.max(prev ?? -1, ...list.map(p => p.id)));
@@ -49,7 +50,8 @@ export function renderList(el, list, {selectedId, onSelect}){
   el.innerHTML = `<table><thead><tr><th>#</th><th>Pitch</th><th>Target</th><th class="num">Miss</th><th class="num">Arm/Glove</th><th class="num">Up/Down</th><th>Direction</th><th>Zone</th><th class="num">Score</th></tr></thead><tbody>` +
     list.slice().reverse().map(p => { const m = p.m;
       return `<tr class="click ${p.id===selectedId?'sel':''}" data-id="${p.id}"><td class="mono">${p.n}</td><td><span class="dot" style="background:${PCOL[p.type]}"></span>${p.type}</td>
-      <td>${p.manual?'<span class="pill warn">Manual</span>':'<span class="pill neutral">Glove</span>'}</td>
+      <td>${p.manual ? '<span class="pill warn">Manual</span>' : p.auto?.state === 'proposed' ? '<span class="pill model" title="The model placed this glove; not reviewed yet">Model?</span>'
+        : p.auto?.state === 'confirmed' ? '<span class="pill model">Model</span>' : '<span class="pill neutral">Glove</span>'}</td>
       <td class="num mono">${fmt(m.d)}"</td><td class="num mono">${m.arm>=0?'A':'G'} ${fmt(Math.abs(m.arm))}"</td><td class="num mono">${m.up>=0?'U':'D'} ${fmt(Math.abs(m.up))}"</td>
       <td>${m.dir}</td><td>${m.inZone?'In':'<span style="color:var(--bad)">Out</span>'}</td><td class="num"><span class="pill ${tone(m.score)}">${m.score}</span></td></tr>`; }).join('') + '</tbody></table>';
   el.onclick = e => { const tr = e.target.closest('tr[data-id]'); if(tr) onSelect(+tr.dataset.id); };
