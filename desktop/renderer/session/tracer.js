@@ -4,7 +4,7 @@
 // It also finds targets with the mitt detector (findTarget): those jobs jump the queue, because the user is
 // waiting on them to save a pitch.
 import { SAMPLE_HZ, workScale, toGray, estimateShift, candidates, findFlight, fitPath } from '../balltrack.js';
-import { modelCrop, sampleTimes, proposeTarget } from '../glovefind.js';
+import { modelCrop, findShow } from '../glovefind.js';
 
 const LOOKBACK_S = 1.0;   // how long before the catch to look for the release (slow curveballs take ~0.7 s)
 
@@ -53,22 +53,22 @@ export function createTracer({src, getFps, onTraced}){
     return {pts: pts.map(([t, x, y]) => [+t.toFixed(4), +x.toFixed(1), +y.toFixed(1)])};
   }
 
-  // The detector's view of each sample time: a square around the zone at full resolution, resized to its input.
+  // The detector sees each sample time as a square around the zone at full resolution, resized to its input.
+  const STOPPED = new Error('The tracer was stopped');
   async function target({loc, zone, input}){
     if(!mctx){ const cv = document.createElement('canvas'); cv.width = cv.height = input; mctx = cv.getContext('2d', {willReadFrequently: true}); }
-    const crop = modelCrop(zone, v.videoWidth, v.videoHeight), samples = [];
-    for(const t of sampleTimes(loc.t)){
-      if(dead) return null;
+    const crop = modelCrop(zone, v.videoWidth, v.videoHeight);
+    return findShow(loc.t, zone, crop, async t => {
+      if(dead) throw STOPPED;
       await seek(t);
       mctx.drawImage(v, crop.x, crop.y, crop.s, crop.s, 0, 0, input, input);
-      samples.push({t: +t.toFixed(3), boxes: await window.bullpen.detect(mctx.getImageData(0, 0, input, input).data, input)});
-    }
-    return proposeTarget(samples, crop, zone);
+      return window.bullpen.detect(mctx.getImageData(0, 0, input, input).data, input);
+    });
   }
   async function serveTargets(){
     while(targets.length && !dead){
       const job = targets.shift();
-      try{ job.resolve(await target(job)); }catch(e){ console.warn('Finding the target failed', e); job.resolve(null); }
+      try{ job.resolve(await target(job)); }catch(e){ if(e !== STOPPED) console.warn('Finding the target failed', e); job.resolve(null); }
     }
   }
 

@@ -56,7 +56,7 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
   $(el, '#types').onclick = e => { const b = e.target.closest('[data-t]'); if(b) onType(b.dataset.t); };
   const placed = !selected && (draft.glove || draft.manual || draft.loc);
   $(el, '#draftHint').textContent = !placed ? '' : draft.glove || draft.manual ? `${draft.manual ? 'Manual target' : 'Glove'} marked. Click where the ball is caught.`
-    : 'Catch marked. The model found no glove: click it at release.';
+    : 'Catch marked. The model couldn\'t find the shown glove: click where the catcher showed it.';
   $(el, '#draftHint').hidden = !placed;
 
   // Zone-third picker, only while Manual is the target type
@@ -78,7 +78,7 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
     const dis = hasVideo ? '' : ' disabled';
     edit.innerHTML = `<div class="lab">Edit</div>
       ${selected.auto?.state === 'proposed' ? `<div class="iacts two"><button type="button" class="btn sm primary" data-a="confirmT" title="Confirm and review the next (Return)">Confirm Target ↩</button><button type="button" class="btn sm" data-a="glove"${dis}>Move Glove</button></div>
-      <div class="hint">The model placed the glove at release. Confirm it, or move it by clicking the glove.</div>` : ''}
+      <div class="hint">The model found where the catcher showed the glove before the pitch. Confirm it, or move it by clicking the glove.</div>` : ''}
       <div class="iacts">
         <button type="button" class="btn sm" data-a="jumpT"${dis}>Go to Target Frame</button>
         <button type="button" class="btn sm" data-a="jumpL"${dis}>Go to Catch Frame</button>

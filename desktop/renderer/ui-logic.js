@@ -2,7 +2,7 @@
 // No DOM access, so the renderer and the tests share one implementation.
 
 export const AVATAR_COLORS = ['#0a84ff','#ff9f0a','#30d158','#bf5af2','#ff375f','#64d2ff','#ffd60a','#5e5ce6'];
-export const HUD = {zone:'Drag a box over the strike zone', target:'Click the glove at release', manual:'Click the intended target', catch:'Click where the ball is caught',
+export const HUD = {zone:'Drag a box over the strike zone', target:'Click where the catcher shows the glove', manual:'Click the intended target', catch:'Click where the ball is caught',
   auto:'Click where the ball is caught · the model finds the glove', finding:'Finding the glove…', noVideo:'Load the bullpen video'};
 export const MIN_CLIP = 0.012;
 
@@ -31,8 +31,8 @@ export function toolState({mode, hasZone, hasVideo, selected, editField, finding
   return {active: tool, catchEnabled, hud: tool === 'auto' && finding ? HUD.finding : HUD[tool]};
 }
 
-// Timeline clip for a pitch as fractions of the video. A pitch with no glove release, or one whose
-// release is not before the catch, is a fixed-width marker centred on the catch.
+// Timeline clip for a pitch as fractions of the video. A pitch with no glove mark, or one whose glove
+// time is not before the catch, is a fixed-width marker centred on the catch.
 export function clipFor(pitch, duration){
   const loc = pitch.loc.t / duration;
   const g = pitch.glove ? pitch.glove.t / duration : null;

@@ -14,14 +14,14 @@ We film a bullpen session from behind the pitcher. The camera is offset a little
 | `app/bullpen-command.html` | A single-page tracker. You tap the target and the catch, and it scores misses, draws trends and exports CSV. | Fully manual. Scale comes from the plate width (wrong depth, see [Calibration](#calibration)). Data lives in one browser's storage. |
 | `pipeline/` | A hand-tuned OpenCV pipeline: it finds the pitches, tracks the ball, finds the catcher by his blue gear and renders a review video. | The crop, the rejected tracks and the glove ids were tuned by eye for one clip (IMG_5997), so it doesn't work on new videos. About 2 px per inch. The ball gets lost against the catcher's uniform. |
 
-| `desktop/` Auto tool | Detector v1 (RF-DETR Small, one class: `mitt`) runs in the app through ONNX Runtime. You click the catch, the model proposes the glove at release, and you confirm or move it. The ball path is traced without a model. | Mitt only, so the catch is still a click. Release is assumed to fall 0.4–0.75 s before the catch rather than detected. v1 confidence is low (about 0.3–0.7). |
+| `desktop/` Auto tool | Detector v1 (RF-DETR Small, one class: `mitt`) runs in the app through ONNX Runtime. You click the catch, the model proposes the target (the last still hold of the mitt before the catch), and you confirm or move it. The ball path is traced without a model. | Mitt only, so the catch is still a click. A catcher who never holds the glove still for 0.6 s gets no proposal. v1 confidence is low (about 0.3–0.7). |
 
 The pipeline proved the concept and showed us what's hard. The plan below replaces its hand-tuned parts with a trained detector and a proper desktop app.
 
 ## Key design decisions
 
 ### What counts as the target
-**The target is the glove position at the pitcher's release frame.** It is not the moment the glove "opens". Catchers drift and some set late, so release is the fairest moment to measure the pitcher's intent against.
+**The target is where the catcher shows the glove before the pitch is thrown.** He holds it open and still on the spot he wants. Then he closes it, and it rides around (often down to his knee) until he moves it to the ball. So the glove at the pitcher's release is not the target. In video the show is the last long, still hold of the mitt before the catch, and that's what the app looks for.
 
 ### How we find the catch point
 **The catch point comes from the ball, not the glove.** We track the ball, fit a curve to its path, and find the frame where it stops. If the ball disappears in the last few frames (which happens against gray gear), we extend the fitted curve to the stop. This way we never need to know whether the glove is open or closed at the catch.
@@ -91,7 +91,7 @@ The desktop app is being built now, in parallel with the detector work.
 | **0. Capture protocol** | Record video the system can measure | A one-page filming guide (see [Capture guidance](#capture-guidance)) and a built calibration board | A test session is filmed to spec with the board |
 | **1. Desktop app, manual** | Replace the HTML page with a real app | Electron app with manual target/catch tagging, 4-tap calibration, athletes/sessions/pitches in SQLite, the review layout, CSV export, and a packaged download | A coach can install it, tag a session and see scores and trends |
 | **2. Dataset + detector v1** | Teach a model to see the ball, mitt and catcher | Labeled frames in COCO format with a held-out validation set, a training script, and an RF-DETR v1 checkpoint | v1 finds the mitt and ball reliably on the validation set |
-| **3. Detection in the app** | Let the app propose the points | ONNX export running in the app, ball tracking with curve fit and catch extrapolation, target taken at the release frame, and confirm/nudge UI | Most pitches only need a confirm tap |
+| **3. Detection in the app** | Let the app propose the points | ONNX export running in the app, ball tracking with curve fit and catch extrapolation, target taken from where the catcher shows the glove, and confirm/nudge UI | Most pitches only need a confirm tap |
 | **4. Accuracy validation** | Show the numbers can be trusted | The ~100-pitch double-tagged test and an app-vs-human report | The accuracy goal is met, or we know what to fix |
 | **5. Later ideas** | Grow the product | Trend reports for coaches, richer exports (PDF/CSV), capture or review on multiple devices, model retraining from confirmed taps | Driven by feedback |
 

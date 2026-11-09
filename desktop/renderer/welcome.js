@@ -30,7 +30,7 @@ export async function showWelcome({hasAthletes, newAthlete}, version){
     <ol class="wsteps">
       <li><b>Add an athlete</b><span>File › New Athlete <kbd>⌘N</kbd></span></li>
       <li><b>Start a session from a bullpen video</b><span>File › New Session <kbd>⌘⇧N</kbd>. Film from behind the pitcher, on a tripod.</span></li>
-      <li><b>Tag each pitch</b><span>Draw the zone once, then click the glove at release (Target) and where the ball is caught (Catch).</span></li>
+      <li><b>Tag each pitch</b><span>Draw the zone once, then click where the catcher shows the glove before the pitch (Target) and where the ball is caught (Catch).</span></li>
     </ol>
     <label class="wcheck"><input type="checkbox" name="always"${pref.always ? ' checked' : ''}> Show this when Bullpen Command opens</label>`});
   const box = document.querySelector('#sheetHost [name=always]');

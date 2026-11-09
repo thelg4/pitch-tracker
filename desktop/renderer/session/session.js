@@ -273,7 +273,7 @@ export async function sessionView(root, id, ctx){
     const m = list.find(x => x.id === p.id).m;
     toast(`#${p.n} ${p.type}: ${m.hit?'hit':'miss'} · ${fmt(m.d)}" · ${m.score} pts${p.auto ? ` · glove found (${Math.round(p.auto.score*100)}%)` : ''}`);
   }
-  // Auto: the click is the catch and the model proposes the glove at release. The pitch is saved once its target
+  // Auto: the click is the catch and the model proposes the target: where the catcher showed the glove before the pitch. The pitch is saved once its target
   // is found, so quick clicks simply queue. If no mitt is found, the catch waits for the user to click the glove.
   async function commitAuto(loc){
     const type = curType, zone = {...S.zone};
@@ -283,7 +283,7 @@ export async function sessionView(root, id, ctx){
     if(!t){
       if(!selectedId && mode === 'auto' && !draft.loc){
         draft = {glove: null, manual: null, loc}; mode = 'target';
-        toast("Couldn't find the glove. Click it at release.");
+        toast("Couldn't find where the catcher showed the glove. Click it.");
       }else toast("Couldn't find the glove for that catch. Mark it with Target.");
       renderAll(); return;
     }
