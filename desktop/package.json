@@ -10,7 +10,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/scoring.test.js test/ui-logic.test.js test/menu.test.js test/balltrack.test.js && ELECTRON_RUN_AS_NODE=1 electron --test test/db.test.js",
+    "test": "node --test test/scoring.test.js test/ui-logic.test.js test/menu.test.js test/balltrack.test.js test/glovefind.test.js test/detector.test.js && ELECTRON_RUN_AS_NODE=1 electron --test test/db.test.js",
     "postinstall": "electron-builder install-app-deps",
     "dist:mac": "electron-builder --mac --arm64 --publish never",
     "dist:win": "electron-builder --win --x64",
@@ -23,10 +23,25 @@
     "files": [
       "main.js",
       "db.js",
+      "detector.js",
       "preload.cjs",
       "menu-template.js",
       "renderer/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/onnxruntime-node/bin/*/linux/**"
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/**"
+    ],
+    "extraResources": [
+      {
+        "from": "models",
+        "to": "models",
+        "filter": [
+          "*.onnx",
+          "*.json"
+        ]
+      }
     ],
     "mac": {
       "category": "public.app-category.sports",
@@ -35,11 +50,17 @@
       ],
       "icon": "build/icon.icns",
       "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "files": [
+        "!node_modules/onnxruntime-node/bin/*/win32/**"
+      ]
     },
     "win": {
       "target": [
         "nsis"
+      ],
+      "files": [
+        "!node_modules/onnxruntime-node/bin/*/darwin/**"
       ]
     },
     "publish": {
@@ -50,7 +71,8 @@
     "artifactName": "Bullpen-Command-${version}-${arch}.${ext}"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3"
+    "better-sqlite3": "^13.0.3",
+    "onnxruntime-node": "^1.31.1"
   },
   "devDependencies": {
     "electron": "^45.1.0",

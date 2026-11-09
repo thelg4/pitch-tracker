@@ -4,11 +4,12 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db.js';
+import { createDetector } from './detector.js';
 import { menuTemplate } from './menu-template.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const VIDEO_EXT = ['mov', 'mp4', 'm4v'];
-let db;
+let db, detector;
 // Tests run in their own profile (window prefs, welcome state) so they never share or lock the real one.
 if(process.env.BULLPEN_USER_DATA) app.setPath('userData', process.env.BULLPEN_USER_DATA);
 const picked = new Set(); // videos chosen this run that aren't attached to a session yet
@@ -75,6 +76,11 @@ app.whenReady().then(() => {
   // Lets the session say a video is missing without requesting it (a 404 from media:// logs a console error).
   ipcMain.handle('video-exists', (_e, file) => (picked.has(file) || db.hasVideo(file)) && fs.existsSync(file));
   ipcMain.handle('app-version', () => app.getVersion());
+  // The mitt detector. The packaged app carries the model in its resources; BULLPEN_MODEL points tests elsewhere.
+  detector = createDetector(process.env.BULLPEN_MODEL ||
+    (app.isPackaged ? path.join(process.resourcesPath, 'models', 'mitt.onnx') : path.join(here, 'models', 'mitt.onnx')));
+  ipcMain.handle('detector-info', () => detector.info());
+  ipcMain.handle('detect', (_e, rgba, size) => detector.detect(rgba, size));
   ipcMain.handle('reveal-db',() => shell.showItemInFolder(path.join(app.getPath('userData'), 'bullpen.db')));
 
   ipcMain.on('menu-state', (_e, id, checked) => { const it = Menu.getApplicationMenu()?.getMenuItemById(id); if(it) it.checked = !!checked; });

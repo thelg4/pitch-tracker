@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld('bullpen', {
   onMenu: cb => { const h = (_e, action) => cb(action); ipcRenderer.on('menu', h); return () => ipcRenderer.removeListener('menu', h); },
   revealDb: () => ipcRenderer.invoke('reveal-db'),
   appVersion: () => ipcRenderer.invoke('app-version'),
+  // The mitt detector: info() says whether a model is installed; detect() takes a square RGBA crop at its input size.
+  detectorInfo: () => ipcRenderer.invoke('detector-info'),
+  detect: (rgba, size) => ipcRenderer.invoke('detect', rgba, size),
   // Tell the menu a checkbox's state (the renderer owns it; see Show All Pitches).
   menuState: (id, checked) => ipcRenderer.send('menu-state', id, checked),
 });
