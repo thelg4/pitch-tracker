@@ -26,13 +26,15 @@ export function modelCrop(zone, frameW, frameH){
 
 const median = vs => { const s = [...vs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m])/2; };
 
-// The strongest box near the zone, in frame pixels, from boxes as the detector returns them (fractions of `crop`).
-export function bestMitt(boxes, crop, zone){
+// The boxes near the zone that could be the mitt, strongest first, in frame pixels, from boxes as the detector
+// returns them (fractions of `crop`).
+export function mitts(boxes, crop, zone){
   const zx = zone.x + zone.w/2, zy = zone.y + zone.h/2;
   return boxes.map(b => ({x: crop.x + b.x*crop.s, y: crop.y + b.y*crop.s, score: b.score}))
     .filter(b => b.score >= MIN_SCORE && Math.hypot(b.x - zx, b.y - zy) <= REACH_ZONES*zone.w)
-    .sort((a, b) => b.score - a.score)[0] ?? null;
+    .sort((a, b) => b.score - a.score);
 }
+export const bestMitt = (boxes, crop, zone) => mitts(boxes, crop, zone)[0] ?? null;
 
 // The shown glove before the catch at `catchT`: {x, y, t, score} in frame pixels, or null if the catcher never held
 // it still long enough. `detectAt(t)` returns the detector's boxes for the frame at video time t. The proposal is
