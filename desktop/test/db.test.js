@@ -91,6 +91,9 @@ test('a model-proposed target round-trips, updates and scales with the session',
   const {pitches} = db.rescaleSession(s.id, 2160, 3840);
   assert.deepEqual(pitches[1].auto, {x: 410, y: 580, score: 0.71, state: 'confirmed'});
   assert.equal(pitches[0].auto, null);
+  // A found pitch's proposed catch scales too.
+  const found = db.addPitch(s.id, pitch(220, {auto: {...auto, catch: {x: 300, y: 400, score: 0.5}}}));
+  assert.deepEqual(db.rescaleSession(s.id, 1080, 1920).pitches.find(p => p.id === found.id).auto.catch, {x: 150, y: 200, score: 0.5});
 });
 
 test('deleting an athlete removes their sessions and pitches', () => {

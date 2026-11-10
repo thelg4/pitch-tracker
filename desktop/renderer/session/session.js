@@ -15,6 +15,7 @@ import { createViewer } from './viewer.js';
 import { renderTimeline, renderList } from './timeline.js';
 import { renderPitchTab, renderSessionTab } from './inspector.js';
 import { createTracer } from './tracer.js';
+import { createAnalyzer } from './analyzer.js';
 
 const TOOLS = [['zone', 'Zone', 'Z'], ['auto', 'Auto', 'A'], ['target', 'Target', 'G'], ['manual', 'Manual', 'M'], ['catch', 'Catch', '']];
 
@@ -30,6 +31,8 @@ export async function sessionView(root, id, ctx){
   let tracer = null;
   // Auto: each click is a catch and the mitt detector proposes the target. `finding` counts catches waiting on it.
   let detector = {available: false}, autoOn = false, finding = 0;
+  // Analyze Session: finds every pitch. `analysis` is {progress, found} while it runs.
+  let analyzer = null, analysis = null;
   let dragZone = null, dragCrop = null, pan = null, raf = 0, popT = 0, pillPlaced = false, tl = null, view = 'timeline';
   function newDraft(){ return {glove:null, manual:null, loc:null}; }
   // The mode a new pitch starts in.
@@ -58,7 +61,7 @@ export async function sessionView(root, id, ctx){
         <span class="time" id="time">0:00.00</span>
       </div>
       <div class="tl">
-        <div class="tlh"><div class="seg" id="viewToggle" role="group" aria-label="Pitch view"><button type="button" data-v="timeline">Timeline</button><button type="button" data-v="list">List</button></div><span class="hint" id="tlHint"></span></div>
+        <div class="tlh"><div class="seg" id="viewToggle" role="group" aria-label="Pitch view"><button type="button" data-v="timeline">Timeline</button><button type="button" data-v="list">List</button></div><span class="hint" id="tlHint"></span><button type="button" class="btn sm" id="analyze" title="Find every pitch: target, catch and ball path (⇧⌘A)">Analyze Session</button></div>
         <div id="timeline"></div>
         <div class="tbl" id="log" hidden></div>
       </div>
@@ -236,7 +239,8 @@ export async function sessionView(root, id, ctx){
     if(sel && editField){
       const f = editField; editField = null;
       // A re-marked catch needs a new path; a re-marked glove means the model's proposal was moved by hand.
-      await savePitch({...sel, [f]: pt, ...(f === 'loc' && {path: null}), ...(f === 'glove' && sel.auto && {auto: {...sel.auto, state: 'nudged'}})});
+      const moved = sel.auto && (f === 'glove' || (f === 'loc' && sel.auto.catch)); // a model proposal moved by hand
+      await savePitch({...sel, [f]: pt, ...(f === 'loc' && {path: null}), ...(moved && {auto: {...sel.auto, state: 'nudged'}})});
       return;
     }
     if(sel) return;
@@ -352,15 +356,51 @@ export async function sessionView(root, id, ctx){
     else if(a === 'done'){ selectedId = null; editField = null; }
     renderAll();
   }
-  // Accept the model's target for the selected pitch and move on to the next one still to review.
+  // Accept the model's proposal for the selected pitch (its target, and its catch if Analyze found it) and move on
+  // to the next one still to review, in video order.
   async function confirmTarget(){
     const p = pitches.find(x => x.id === selectedId);
     if(p?.auto?.state !== 'proposed') return;
     await savePitch({...p, auto: {...p.auto, state: 'confirmed'}}); if(dead) return;
-    const next = pitches.find(x => x.auto?.state === 'proposed' && x.n > p.n) || pitches.find(x => x.auto?.state === 'proposed');
+    const todo = pitches.filter(x => x.auto?.state === 'proposed').sort((a, b) => a.loc.t - b.loc.t);
+    const next = todo.find(x => x.loc.t > p.loc.t) || todo[0];
     selectedId = null; editField = null;
-    if(next) selectPitch(next.id); else { toast('All model targets reviewed'); renderAll(); }
+    if(next) selectPitch(next.id); else { toast('All model proposals reviewed'); renderAll(); }
   }
+  /* ---------- Analyze Session ---------- */
+  function analyze(){
+    if(analyzer){ stopAnalysis(); toast(`Stopped. ${analysis.found} pitch${analysis.found === 1 ? '' : 'es'} found so far.`); renderAll(); return; }
+    if(!detector.available){ toast('Analyze needs the mitt model. See the README to install it.'); return; }
+    if(!hasVideo){ toast('Load the video to analyze it.'); return; }
+    if(!S.zone){ redrawZone(); toast('Draw the strike zone first: the model looks for the catcher around it.'); return; }
+    const a = createAnalyzer({src: mediaUrl(S.videoPath), zone: {...S.zone}, input: detector.input,
+      onProgress: f => { if(analyzer === a){ analysis.progress = f; renderAnalysis(); } },
+      onPitch: found});
+    analyzer = a; analysis = {progress: 0, found: 0}; renderAll();
+    a.run().then(() => {
+      if(analyzer !== a) return;
+      const n = analysis.found; stopAnalysis();
+      toast(n ? `Found ${n} pitch${n === 1 ? '' : 'es'}. Select one to review it: Return confirms.` : 'No new pitches found.');
+      renderAll();
+    }, e => { console.warn('Analysis failed', e); if(analyzer === a){ stopAnalysis(); toast("Couldn't analyze this video."); renderAll(); } });
+  }
+  function stopAnalysis(){ analyzer?.stop(); analyzer = null; analysis = null; }
+  // A pitch the analysis found, unless one is already tagged at that catch (so a second run adds only what's new).
+  async function found(d){
+    if(dead || pitches.some(p => Math.abs(p.loc.t - d.loc.t) < 1)) return;
+    const p = await db('addPitch', S.id, {type: curType, manual: null, zone: {...S.zone}, ...d}); if(dead) return;
+    pitches.push(p); if(analysis) analysis.found++;
+    pitchesChanged();
+  }
+  function renderAnalysis(){
+    const b = q('#analyze');
+    b.textContent = analysis ? `Stop · ${Math.round(analysis.progress*100)}%` : 'Analyze Session';
+    b.classList.toggle('primary', !!analysis);
+    b.disabled = !detector.available;
+    if(analysis) q('#tlHint').textContent = `Finding pitches… ${analysis.found} found`;
+  }
+  q('#analyze').onclick = analyze;
+
   async function deletePitch(){
     const p = list.find(x => x.id === selectedId);
     if(!p){ toast('Select a pitch to delete it.'); return; }
@@ -439,9 +479,9 @@ export async function sessionView(root, id, ctx){
   /* ---------- session actions (menu and title bar) ---------- */
   function csv(){
     const q = s => '"' + String(s).replace(/"/g, '""') + '"';
-    const head = 'athlete,date,pitch,type,target_source,miss_in,arm_side_in,up_in,direction,in_zone,hit,score,setup_offset_in,catch_time_s,glove_by_model,model_score';
+    const head = 'athlete,date,pitch,type,target_source,miss_in,arm_side_in,up_in,direction,in_zone,hit,score,setup_offset_in,catch_time_s,glove_by_model,model_score,catch_by_model';
     return [head, ...list.map(p => { const m = p.m; return [q(A.name), S.recordedOn, p.n, p.type, p.manual?'manual':'glove', fmt(m.d,2), fmt(m.arm,2), fmt(m.up,2), m.dir, m.inZone, m.hit, m.score, m.setupOff==null?'':fmt(m.setupOff,2), p.loc.t,
-      p.auto?.state ?? '', p.auto ? p.auto.score : ''].join(','); })].join('\n');
+      p.auto?.state ?? '', p.auto ? p.auto.score : '', p.auto?.catch ? 'yes' : ''].join(','); })].join('\n');
   }
   // Copy to the clipboard; if that fails, show the CSV selected in a sheet so ⌘C copies it.
   async function exportCsv(){
@@ -476,6 +516,7 @@ export async function sessionView(root, id, ctx){
     'show-paths': () => { showPaths = showPathsPref(!showPaths); window.bullpen.menuState('show-paths', showPaths); drawStages(); },
     'frame-catcher': () => frameCatcher(),
     'redraw-zone': redrawZone,
+    'analyze-session': analyze,
     'delete-session': deleteSession,
     'new-session': () => ctx.newSession(A.id),
   };
@@ -501,7 +542,7 @@ export async function sessionView(root, id, ctx){
     const sel = list.find(p => p.id === selectedId) || null;
     const ts = toolState({mode, hasZone: !!S.zone, hasVideo, draft, selected: sel ? {n: sel.n} : null, editField, finding});
     q('#hud').textContent = ts.hud; renderTools(ts);
-    renderInspector(sel); renderTL(); drawStages();
+    renderInspector(sel); renderTL(); renderAnalysis(); drawStages();
   }
   vid.addEventListener('timeupdate', syncTime);
   // Whether the mitt model is installed decides if Auto is offered; Auto stays on across sessions once chosen.
@@ -516,7 +557,7 @@ export async function sessionView(root, id, ctx){
 
   function cleanup(){
     dead = true;
-    document.removeEventListener('keydown', onKey); ro.disconnect(); cancelAnimationFrame(raf); clearTimeout(popT); tracer?.destroy();
+    document.removeEventListener('keydown', onKey); ro.disconnect(); cancelAnimationFrame(raf); clearTimeout(popT); tracer?.destroy(); stopAnalysis();
     const score = iq('#bigScore'); if(score) settleCount(score);
     const crop = viewer.flush(); if(crop && hasVideo) db('updateSession', S.id, {crop});
     vid.pause(); vid.removeAttribute('src'); vid.load();

@@ -8,7 +8,7 @@ function collect(items, out = []){
 }
 const ACTIONS = ['new-athlete', 'new-session', 'relink-video', 'show-db', 'export-csv', 'undo-mark', 'delete-pitch',
   'toggle-sidebar', 'toggle-inspector', 'toggle-list', 'inspector-pitch', 'inspector-session',
-  'show-all', 'show-paths', 'frame-catcher', 'redraw-zone', 'delete-session', 'welcome', 'help-score'];
+  'show-all', 'show-paths', 'frame-catcher', 'redraw-zone', 'analyze-session', 'delete-session', 'welcome', 'help-score'];
 
 test('every clickable item sends exactly its action', () => {
   const sent = [];

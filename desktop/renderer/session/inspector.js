@@ -14,7 +14,8 @@ const side = (v, pos, neg) => `${v >= 0 ? pos : neg} ${fmt(Math.abs(v))}"`;
 const kv = (k, v, attrs = '') => `<div class="kv"><span>${k}</span><span${attrs}>${v}</span></div>`;
 // Where a pitch's target came from: a manual pick, a clicked glove, or the mitt detector (and whether it was reviewed).
 const targetLabel = p => p.manual ? 'Manual' : !p.auto ? 'Glove'
-  : p.auto.state === 'proposed' ? `Model · ${Math.round(p.auto.score*100)}% · review` : p.auto.state === 'confirmed' ? 'Model · confirmed' : 'Glove · model moved';
+  : p.auto.state === 'proposed' ? `Model · ${Math.round(p.auto.score*100)}% · review` : p.auto.state === 'confirmed' ? 'Model · confirmed' : 'Model · moved';
+const catchLabel = p => p.auto.state === 'proposed' ? 'Model · review' : p.auto.state === 'confirmed' ? 'Model · confirmed' : 'Model · moved';
 
 /* ---------- Pitch tab ---------- */
 
@@ -69,22 +70,23 @@ export function renderPitchTab(el, {list, selected, draft, curType, source, hasV
     const m = p.m;
     sec.innerHTML = `<div class="lab">${selected ? `Pitch #${p.n} · ${TNAME[p.type]}` : 'Last pitch'}</div>` +
       kv('Miss', `${fmt(m.d)}"`) + kv('Arm / glove', side(m.arm, 'A', 'G')) + kv('Up / down', side(m.up, 'U', 'D')) +
-      kv('Target', targetLabel(p)) + kv('Ball path', pathState(p), ' id="pathState"') + kv('Score', m.score, ` style="color:var(--${tone(m.score)})"`);
+      kv('Target', targetLabel(p)) + (p.auto?.catch ? kv('Catch', catchLabel(p)) : '') + kv('Ball path', pathState(p), ' id="pathState"') + kv('Score', m.score, ` style="color:var(--${tone(m.score)})"`);
   }else sec.innerHTML = '<div class="lab">Last pitch</div><div class="hint">Mark the glove, then the catch, to tag a pitch.</div>';
 
   // Edit actions for a selected pitch
   const edit = $(el, '#editSec'); edit.hidden = !selected;
   if(selected){
-    const dis = hasVideo ? '' : ' disabled';
+    const dis = hasVideo ? '' : ' disabled', proposed = selected.auto?.state === 'proposed', found = !!selected.auto?.catch;
     edit.innerHTML = `<div class="lab">Edit</div>
-      ${selected.auto?.state === 'proposed' ? `<div class="iacts two"><button type="button" class="btn sm primary" data-a="confirmT" title="Confirm and review the next (Return)">Confirm Target ↩</button><button type="button" class="btn sm" data-a="glove"${dis}>Move Glove</button></div>
-      <div class="hint">The model found where the catcher showed the glove before the pitch. Confirm it, or move it by clicking the glove.</div>` : ''}
+      ${proposed ? `<div class="iacts two"><button type="button" class="btn sm primary" data-a="confirmT" title="Confirm and review the next (Return)">${found ? 'Confirm Pitch' : 'Confirm Target'} ↩</button><button type="button" class="btn sm" data-a="glove"${dis}>Move Glove</button>${found ? `<button type="button" class="btn sm" data-a="loc"${dis}>Move Catch</button>` : ''}</div>
+      <div class="hint">${found ? 'The model found this pitch: the glove where the catcher showed it (dashed ring) and the catch (dashed ball). Confirm both, or move either by clicking.'
+        : 'The model found where the catcher showed the glove before the pitch. Confirm it, or move it by clicking the glove.'}</div>` : ''}
       <div class="iacts">
         <button type="button" class="btn sm" data-a="jumpT"${dis}>Go to Target Frame</button>
         <button type="button" class="btn sm" data-a="jumpL"${dis}>Go to Catch Frame</button>
-        ${selected.auto?.state === 'proposed' ? '' : `<button type="button" class="btn sm" data-a="glove"${dis}>Re-mark Glove</button>`}
+        ${proposed ? '' : `<button type="button" class="btn sm" data-a="glove"${dis}>Re-mark Glove</button>`}
         <button type="button" class="btn sm" data-a="manual">${selected.manual ? 'Re-mark Manual' : 'Set Manual Target'}</button>
-        <button type="button" class="btn sm" data-a="loc"${dis}>Re-mark Location</button>
+        ${proposed && found ? '' : `<button type="button" class="btn sm" data-a="loc"${dis}>Re-mark Location</button>`}
         ${selected.manual && selected.glove ? '<button type="button" class="btn sm" data-a="clearM">Use Glove Instead</button>' : ''}
       </div>
       ${selected.m.setupOff != null ? `<div class="hint">Catcher set up ${fmt(selected.m.setupOff)}" from the intended target.</div>` : ''}

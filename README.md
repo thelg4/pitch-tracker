@@ -43,9 +43,13 @@ It has two parts: a browser app for tagging and scoring, and a Python/OpenCV pip
 | `frames.swift`, `crop.swift` | Frame grabs via AVFoundation. |
 | `export_detector.py` | Exports a trained RF-DETR checkpoint to the ONNX model the desktop app runs (see below). |
 
-## The mitt detector (desktop Auto mode)
+## The mitt detector (Analyze Session and Auto)
 
-The desktop app's **Auto** tool (key A) needs only a click on the catch. A trained detector follows the catcher's mitt back from the catch and proposes the target: where he showed the glove, held still, before the pitch (he then closes it and it moves until the catch). Each proposal is marked for review: select the pitch, check the dashed cyan ring, then press Return to confirm it or click **Move Glove**. The CSV records which targets came from the model and whether they were confirmed or moved.
+**Analyze Session** (the button above the timeline, or ⇧⌘A) finds every pitch in the video without clicks. Draw the strike zone first. It tracks the catcher's mitt across the whole video with a trained detector and finds each time he shows the glove (holds it still on his spot). Then it looks for the ball's flight toward him in the next few seconds with the model-free ball tracker, which ignores throws back to the pitcher. A pitch is a flight that ends at the mitt: the target is the show before it and the catch is where the mitt meets the ball. A 3-minute 4K clip takes about 7 minutes. Pitches appear as they are found, and a second run adds only new ones.
+
+The **Auto** tool (key A) is the one-click version: click the catch and the model finds where the catcher showed the glove.
+
+Everything the model proposes is marked for review: a dashed cyan ring on the target (and on the catch, for a found pitch), and *Model?* in the list. Select a pitch, then press Return to confirm it, or click **Move Glove** or **Move Catch**. The CSV records what the model found and whether you confirmed or moved it.
 
 The model is not in git. To install or update it:
 ```bash

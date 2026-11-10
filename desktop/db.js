@@ -40,6 +40,7 @@ const MIGRATIONS = [
   `ALTER TABLE pitches ADD COLUMN path TEXT;`,
   // A target the mitt detector proposed: {x, y, score, state} with the proposal in frame pixels and state
   // 'proposed' (not reviewed), 'confirmed' or 'nudged' (re-marked by hand). Null for a hand-placed target.
+  // A pitch Analyze Session found also has catch: {x, y, score}, the catch it proposed.
   `ALTER TABLE pitches ADD COLUMN auto TEXT;`,
 ];
 
@@ -150,7 +151,8 @@ export function openDb(file){
         const crop = s.crop && {...s.crop, cx: s.crop.cx*k, cy: s.crop.cy*k, w: s.crop.w*k};
         api.updateSession(id, {zone: box(s.zone), crop});
         const path = pa => pa && {...pa, pts: pa.pts.map(([t, x, y]) => [t, x*k, y*k])};
-        for(const p of pitchesFor(id)) api.updatePitch(p.id, {...p, glove: sp(p.glove), manual: sp(p.manual), loc: sp(p.loc), zone: box(p.zone), path: path(p.path), auto: sp(p.auto)});
+        const auto = a => a && {...sp(a), ...(a.catch && {catch: sp(a.catch)})};
+        for(const p of pitchesFor(id)) api.updatePitch(p.id, {...p, glove: sp(p.glove), manual: sp(p.manual), loc: sp(p.loc), zone: box(p.zone), path: path(p.path), auto: auto(p.auto)});
       }
       api.updateSession(id, {frameW: w, frameH: h});
       return api.getSession(id);

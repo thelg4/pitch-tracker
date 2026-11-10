@@ -104,6 +104,9 @@ export function createViewer({fullCanvas: cvFull, cropCanvas: cvCrop, video: vid
     if(p.loc){
       if(t){ c.strokeStyle = col; c.lineWidth = 2*lw; c.beginPath(); c.moveTo(t.x,t.y); c.lineTo(p.loc.x,p.loc.y); c.stroke(); }
       c.fillStyle = col; c.strokeStyle = '#fff'; c.lineWidth = 1.5*lw; c.beginPath(); c.arc(p.loc.x, p.loc.y, ballR, 0, 7); c.fill(); c.stroke();
+      if(p.auto?.catch && p.auto.state === 'proposed'){ // a catch the model found, not reviewed yet
+        c.strokeStyle = '#64D2FF'; c.lineWidth = 2*lw; c.setLineDash([4*lw,3*lw]); c.beginPath(); c.arc(p.loc.x, p.loc.y, ballR*1.6, 0, 7); c.stroke(); c.setLineDash([]);
+      }
     }
     c.globalAlpha = 1;
   }

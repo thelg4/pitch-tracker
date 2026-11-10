@@ -38,6 +38,8 @@ export function menuTemplate(send){
       item('Frame Catcher  C', 'frame-catcher'),
       item('Redraw Zone  Z', 'redraw-zone'),
       { type: 'separator' },
+      item('Analyze Session', 'analyze-session', 'CmdOrCtrl+Shift+A'),
+      { type: 'separator' },
       item('Delete Session…', 'delete-session'),
     ] },
     { label: 'Help', submenu: [item('Welcome to Bullpen Command', 'welcome'), item('How the Score Works', 'help-score')] },
