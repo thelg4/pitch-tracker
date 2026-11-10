@@ -14,6 +14,7 @@ const OUT = path.join(HERE, '.out');
 const DB = path.join(OUT, 'packaged.db'), VIDEO = path.join(OUT, 'test_hevc.mov');
 const BIN = path.join(APP, 'dist/mac-arm64/Bullpen Command.app/Contents/MacOS/Bullpen Command');
 const electronBin = createRequire(path.join(APP, 'package.json'))('electron');
+const VERSION = JSON.parse(fs.readFileSync(path.join(APP, 'package.json'), 'utf8')).version;
 
 if (!fs.existsSync(BIN)) { console.error(`No packaged app at ${BIN}. Run \`npm run dist:mac\` first.`); process.exit(1); }
 execFileSync(path.join(HERE, 'make-clip.sh'), { stdio: 'inherit' });
@@ -34,7 +35,7 @@ try {
   assert.equal(await app.evaluate(({ app }) => app.isPackaged), true);
   // A fresh profile is a first launch: the welcome opens, showing the packaged version; close it.
   await page.waitForSelector('#sheetHost .welcome');
-  assert.match(await page.$eval('#sheetHost .wver', e => e.textContent), /Version 0\.2\.\d+/);
+  assert.match(await page.$eval('#sheetHost .wver', e => e.textContent), new RegExp(`Version ${VERSION.replaceAll('.', '\\.')}\\b`));
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#sheetHost form'));
   await page.click('.sb-athlete[data-id]');
