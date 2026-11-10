@@ -159,7 +159,8 @@ function straightness(chain){
 // `catchPt` is the tagged catch {x, y, t} in working px. Returns [{k, x, y, area}] or null.
 // The flight must last a while (minLen samples), keep a steady direction, and end within `nearPx` of the catch
 // mark no earlier than `earlyS` seconds before it (the ball can vanish against the catcher's gear).
-export function findFlight(cands, times, catchPt, {minLen = 8, nearPx = 120, earlyS = 0.3, lateS = 0.1} = {}){
+// `accept(chain)` can rule out flights of the wrong kind, such as the throw back to the pitcher.
+export function findFlight(cands, times, catchPt, {minLen = 8, nearPx = 120, earlyS = 0.3, lateS = 0.1, accept = null} = {}){
   let best = null;
   for(let k = 0; k + 1 < cands.length; k++){
     const c0 = cands[k], c1 = cands[k+1];
@@ -176,6 +177,7 @@ export function findFlight(cands, times, catchPt, {minLen = 8, nearPx = 120, ear
       const end = chain[chain.length-1], te = times[end.k];
       if(te < catchPt.t - earlyS || te > catchPt.t + lateS) continue;
       if(Math.hypot(end.x - catchPt.x, end.y - catchPt.y) > nearPx) continue;
+      if(accept && !accept(chain)) continue;
       const score = chain.length*s;
       if(!best || score > best.score) best = {score, chain};
     }

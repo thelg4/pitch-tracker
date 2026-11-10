@@ -61,6 +61,16 @@ test('candidates include the ball but not the moving body', () => {
   }
 });
 
+test('findFlight skips flights its accept test rules out', () => {
+  const n = 30, {frames, ball} = scene(n);
+  const {cands, times} = track(frames);
+  const end = ball(n - 2), catchPt = {x: end.x + 3, y: end.y + 2, t: times[n - 2]};
+  const seen = [];
+  assert.ok(findFlight(cands, times, catchPt, {accept: ch => { seen.push(ch.length); return true; }}));
+  assert.ok(seen.length > 0, 'accept was asked');
+  assert.equal(findFlight(cands, times, catchPt, {accept: () => false}), null);
+});
+
 test('findFlight follows the ball to the catch and fitPath ends on the mark', () => {
   const n = 30, {frames, ball} = scene(n);
   const {cands, times} = track(frames);
