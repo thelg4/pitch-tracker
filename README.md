@@ -1,7 +1,32 @@
 # Bullpen Command Tracker
 
 Measures pitch command from bullpen video: where the catcher sets up versus where the ball is caught.
-It has two parts: a browser app for tagging and scoring, and a Python/OpenCV pipeline that finds the pitches in a video and renders a side-by-side review video.
+It has three parts:
+- **`desktop/`**: the main app. It's an Electron app for macOS and Windows that tracks athletes and sessions over time and finds pitches with a trained mitt detector.
+- **`app/`**: the original single-page tracker for tagging and scoring in a browser.
+- **`pipeline/`**: a Python/OpenCV pipeline that finds the pitches in one video and renders a side-by-side review video.
+
+## desktop/
+
+Bullpen Command keeps athletes, sessions and pitches in a local SQLite database. You add an athlete, attach a bullpen video (`.mov`, `.mp4` or `.m4v`, by choosing it or dragging it in), draw the strike zone, and then tag each pitch. You can tag by hand (Target, then Catch), let the model do one pitch with **Auto**, or let it find every pitch with **Analyze Session** (see [The mitt detector](#the-mitt-detector-analyze-session-and-auto)). The athlete page charts command across sessions.
+
+```bash
+cd desktop
+npm install        # also rebuilds better-sqlite3 for Electron
+npm start
+```
+
+| Command | What it does |
+|---|---|
+| `npm test` | Unit tests (scoring, UI logic, menu, ball tracker, glove finder, autodetect, detector) plus the database tests under Electron. |
+| `npm run test:e2e` | Launches the real app with Playwright, tags pitches by clicking, and checks they read back. Needs `ffmpeg` at `/opt/homebrew/bin` to make its test clip. |
+| `npm run dist:mac` | Builds an ad-hoc signed arm64 DMG in `desktop/dist/`, with the model bundled. |
+| `npm run test:packaged` | Smoke-tests the built app from `dist:mac`. |
+| `npm run dist:win` | Builds a Windows x64 installer. |
+
+**Where data lives:** `bullpen.db` in the app's user-data folder (`~/Library/Application Support/Bullpen Command/` on macOS). The **Show Database File** menu item reveals it in Finder. Videos stay where they are, and the database stores only their paths.
+
+**Environment overrides** (the tests use them): `BULLPEN_DB` sets the database file, `BULLPEN_USER_DATA` sets the profile folder, and `BULLPEN_MODEL` sets the ONNX model path.
 
 ## app/
 
