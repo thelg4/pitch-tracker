@@ -3,13 +3,13 @@
 // trace reads about a second of video, sampled ~60 times a second, ending just after the tagged catch.
 // It also finds targets with the mitt detector (findTarget): those jobs jump the queue, because the user is
 // waiting on them to save a pitch.
-import { SAMPLE_HZ, workScale, toGray, estimateShift, candidates, findFlight, fitPath } from '../balltrack.js';
+import { SAMPLE_HZ, workScale, toGray, estimateShift, candidates, findFlight, fitPath, PATH_FIT } from '../balltrack.js';
 import { modelCrop, findShow } from '../glovefind.js';
 
 const LOOKBACK_S = 1.0;   // how long before the catch to look for the release (slow curveballs take ~0.7 s)
 
 // `getFps()` reads the session's fps setting at trace time. `onTraced(pitch, path)` gets the pitch as it was
-// when it was queued and its path {pts: [[t, x, y]…]} in frame pixels, with no points if the ball wasn't found.
+// when it was queued and its path {fit, pts: [[t, x, y]…]} in frame pixels, with no points if the ball wasn't found.
 export function createTracer({src, getFps, onTraced}){
   const v = document.createElement('video');
   v.muted = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'; v.src = src;
@@ -48,9 +48,9 @@ export function createTracer({src, getFps, onTraced}){
     const near = Math.max(60, 1.5*(p.zone?.w ?? 0)*scale); // how close to the catch mark the flight must end
     const flight = findFlight(cands, times, {x: p.loc.x*scale, y: p.loc.y*scale, t: catchT},
       {minLen: Math.max(5, Math.round(0.15*fps/stride)), nearPx: near});
-    if(!flight) return {pts: []};
+    if(!flight) return {fit: PATH_FIT, pts: []};
     const pts = fitPath(flight.map(c => ({t: times[c.k], x: c.x/scale, y: c.y/scale})), {t: catchT, x: p.loc.x, y: p.loc.y}, stride/fps);
-    return {pts: pts.map(([t, x, y]) => [+t.toFixed(4), +x.toFixed(1), +y.toFixed(1)])};
+    return {fit: PATH_FIT, pts: pts.map(([t, x, y]) => [+t.toFixed(4), +x.toFixed(1), +y.toFixed(1)])};
   }
 
   // The detector sees each sample time as a square around the zone at full resolution, resized to its input.

@@ -16,6 +16,7 @@ import { renderTimeline, renderList } from './timeline.js';
 import { renderPitchTab, renderSessionTab } from './inspector.js';
 import { createTracer } from './tracer.js';
 import { createAnalyzer } from './analyzer.js';
+import { needsTrace } from '../balltrack.js';
 
 const TOOLS = [['zone', 'Zone', 'Z'], ['auto', 'Auto', 'A'], ['target', 'Target', 'G'], ['manual', 'Manual', 'M'], ['catch', 'Catch', '']];
 
@@ -111,11 +112,11 @@ export async function sessionView(root, id, ctx){
   }
 
   /* ---------- ball paths ---------- */
-  // A fresh tracer per loaded video; it starts on every pitch that hasn't been traced yet.
+  // A fresh tracer per loaded video; it starts on every pitch that hasn't been traced yet, or was traced by an older fit.
   function startTracer(){
     tracer?.destroy();
     tracer = createTracer({src: mediaUrl(S.videoPath), getFps: () => S.fps, onTraced: pathTraced});
-    pitches.filter(p => !p.path).forEach(p => tracer.add(p));
+    pitches.filter(p => needsTrace(p.path)).forEach(p => tracer.add(p));
   }
   // Keep the path only if the catch it was traced to is still the pitch's catch; a re-mark queued a new trace.
   async function pathTraced(p, path){

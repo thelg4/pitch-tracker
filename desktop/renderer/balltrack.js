@@ -187,13 +187,10 @@ export function findFlight(cands, times, catchPt, {minLen = 8, nearPx = 120, ear
 
 /* ---------- fitting ---------- */
 
-// Weighted least-squares polynomial (degree ≤ 3) through (u, v) points; returns coefficients, lowest first.
-function polyfit(us, vs, ws, deg){
-  const n = deg + 1, A = Array.from({length: n}, () => new Float64Array(n + 1));
-  for(let i = 0; i < us.length; i++){
-    const pw = [1]; for(let d = 1; d < 2*n; d++) pw.push(pw[d-1]*us[i]);
-    for(let r = 0; r < n; r++){ for(let c = 0; c < n; c++) A[r][c] += ws[i]*pw[r+c]; A[r][n] += ws[i]*pw[r]*vs[i]; }
-  }
+// Weighted linear least squares: the x minimising Σ w·(row·x − rhs)², by the normal equations.
+function lsq(rows, rhs, ws){
+  const n = rows[0].length, A = Array.from({length: n}, () => new Float64Array(n + 1));
+  rows.forEach((r, i) => { for(let a = 0; a < n; a++){ for(let b = 0; b < n; b++) A[a][b] += ws[i]*r[a]*r[b]; A[a][n] += ws[i]*r[a]*rhs[i]; } });
   for(let c = 0; c < n; c++){ // Gauss-Jordan with partial pivoting
     let p = c; for(let r = c+1; r < n; r++) if(Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
     [A[c], A[p]] = [A[p], A[c]];
@@ -201,19 +198,61 @@ function polyfit(us, vs, ws, deg){
   }
   return A.map((row, i) => row[n]/A[i][i]);
 }
-const polyval = (co, u) => co.reduce((s, c, i) => s + c*u**i, 0);
 
-// A smooth curve (cubic in time for x and for y) through the flight's points [{t, x, y}], pulled onto the catch
-// mark {t, x, y} so the drawn path ends where the pitch was tagged. Sampled at `step` seconds: [[t, x, y]…].
+// A pitch's screen path, from its physics. In 3D the ball flies a parabola while its depth from the camera changes
+// steadily, so on screen x = (a0 + a1·u + a2·u²)/(1 + c·u) and the same for y, sharing the depth term c (u is time
+// scaled to 0…1). That slows the ball down on screen just as perspective does, and it can't wiggle the way a
+// polynomial in time does when it tries to. Multiplying out the denominator makes it linear in the 7 unknowns.
+// Returns (u) => [x, y], or null if there are too few points or the fit puts the ball behind the camera.
+function perspectiveFit(all, us, ws, withDepth){
+  const deg = Math.min(2, all.length - 1), k = deg + 1, rows = [], rhs = [], w2 = [];
+  all.forEach((p, i) => {
+    const pw = [1, us[i], us[i]**2].slice(0, k), z = new Array(k).fill(0), d = withDepth ? [-us[i]*p.x] : [], e = withDepth ? [-us[i]*p.y] : [];
+    rows.push([...pw, ...z, ...d]); rhs.push(p.x); w2.push(ws[i]);
+    rows.push([...z, ...pw, ...e]); rhs.push(p.y); w2.push(ws[i]);
+  });
+  if(withDepth && all.length < 4) return null;
+  const s = lsq(rows, rhs, w2), c = withDepth ? s[2*k] : 0;
+  if(!s.every(Number.isFinite) || c <= -0.9) return null; // 1 + c·u must stay well above 0 for u in 0…1
+  const poly = (o, u) => s[o] + (k > 1 ? s[o+1]*u : 0) + (k > 2 ? s[o+2]*u*u : 0);
+  return u => [poly(0, u)/(1 + c*u), poly(k, u)/(1 + c*u)];
+}
+
+// The version of fitPath that drew a stored path ({fit, pts}). Bump it when the fit changes so saved paths are
+// traced again: 1 (or none) was a cubic in time held to the tagged catch time, which hooked near the catch; 2 is
+// perspectiveFit, ending when the ball reaches the mark.
+export const PATH_FIT = 2;
+// Whether a pitch's stored path should be (re)traced: never traced, or traced by an older fit. A path whose ball
+// wasn't found ({pts: []}) is kept, since the fit doesn't change what findFlight finds.
+export const needsTrace = path => !path || (path.pts.length > 0 && path.fit !== PATH_FIT);
+
+const BLEND_S = 0.1; // the shortest stretch over which the path eases from the ball's line onto the catch mark
+
+// A smooth curve through the flight's points [{t, x, y}] that ends on the catch mark {t, x, y}. The ball points
+// are the measurement; the mark is the mitt, which can sit behind where the ball went in or off its line, and is
+// tagged late (when the ball is plainly in the mitt, or at the mitt's 10 Hz sample). So:
+//   1. fit the flight alone (perspectiveFit), so the curve stays on the ball where it was seen;
+//   2. the ball arrives where that curve passes nearest the mark, from mid-flight up to the tagged catch;
+//   3. the gap left at arrival is eased in after the ball was last seen (over at least BLEND_S), so the path
+//      ends on the mark without stalling, looping back, or pulling the seen stretch off the ball.
+// Sampled at `step` seconds: [[t, x, y]…].
 export function fitPath(points, catchPt, step = 1/SAMPLE_HZ){
-  const t0 = points[0].t, span = Math.max(catchPt.t - t0, 1e-3);
-  const all = [...points, catchPt], us = all.map(p => (p.t - t0)/span), ws = all.map((_, i) => i === points.length ? 8 : 1);
-  const deg = Math.min(3, all.length - 1);
-  const cx = polyfit(us, all.map(p => p.x), ws, deg), cy = polyfit(us, all.map(p => p.y), ws, deg);
+  const t0 = points[0].t, tLast = points[points.length-1].t, span0 = Math.max(catchPt.t - t0, 1e-3);
+  const us = points.map(p => (p.t - t0)/span0), ws = points.map(() => 1);
+  const fit = perspectiveFit(points, us, ws, true) || perspectiveFit(points, us, ws, false); // without depth: a parabola
+  const flight = t => fit((t - t0)/span0);
+  let arrive = catchPt.t, best = Infinity;
+  for(let t = (t0 + tLast)/2; t <= catchPt.t + 1e-9; t += 1/240){
+    const [x, y] = flight(t), d = Math.hypot(x - catchPt.x, y - catchPt.y);
+    if(d < best){ best = d; arrive = t; }
+  }
+  const [ax, ay] = flight(arrive), ox = catchPt.x - ax, oy = catchPt.y - ay;
+  const span = Math.max(arrive - t0, 1e-3), tb = Math.max(t0, Math.min(tLast, arrive - BLEND_S));
   const out = [], n = Math.max(1, Math.round(span/step));
   for(let i = 0; i <= n; i++){
-    const u = i/n, t = t0 + u*span;
-    out.push(i === n ? [catchPt.t, catchPt.x, catchPt.y] : [t, polyval(cx, u), polyval(cy, u)]);
+    if(i === n){ out.push([arrive, catchPt.x, catchPt.y]); break; }
+    const t = t0 + i/n*span, s = t <= tb ? 0 : (t - tb)/(arrive - tb), w = s*s, [x, y] = flight(t); // eases in, so it bends one way
+    out.push([t, x + w*ox, y + w*oy]);
   }
   return out;
 }

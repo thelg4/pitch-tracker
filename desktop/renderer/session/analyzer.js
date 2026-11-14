@@ -4,7 +4,7 @@
 //   2. the ball, SAMPLE_HZ times a second in a window after each show, through the model-free ball tracker.
 // Each frame's seek is started before the previous frame is processed, so decoding and work overlap.
 // A pitch is handed to onPitch as soon as it is found, ready to save: {glove, loc, path, auto}.
-import { SAMPLE_HZ, workScale, toGray, estimateShift, candidates, findFlight, fitPath } from '../balltrack.js';
+import { SAMPLE_HZ, workScale, toGray, estimateShift, candidates, findFlight, fitPath, PATH_FIT } from '../balltrack.js';
 import { modelCrop, mitts } from '../glovefind.js';
 import { TRACK_HZ, findHolds, ballWindow, towardCatcher, targetFor, catchFor } from '../autodetect.js';
 
@@ -84,7 +84,7 @@ export function createAnalyzer({src, zone, input, onProgress, onPitch}){
       await onPitch({
         glove: {x: show.x, y: show.y, t: +show.t1.toFixed(3)},
         loc: {x: c.x, y: c.y, t: +c.t.toFixed(3)},
-        path: {pts},
+        path: {fit: PATH_FIT, pts},
         auto: {x: show.x, y: show.y, score: +show.score.toFixed(3), state: 'proposed', catch: {x: c.x, y: c.y, score: +c.score.toFixed(3)}},
       });
     }
